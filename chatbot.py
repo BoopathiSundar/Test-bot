@@ -1,7 +1,7 @@
 import sqlite3
 import requests
 
-OLLAMA_URL = "http://localhost:11434/api/chat"
+from ollama_config import OLLAMA_URL, OLLAMA_MODEL, OLLAMA_TIMEOUT, OLLAMA_STREAM
 
 # Connect to SQLite
 conn = sqlite3.connect("chatbot.db")
@@ -68,10 +68,11 @@ while True:
     response = requests.post(
         OLLAMA_URL,
         json={
-            "model": "llama3.2",
+            "model": OLLAMA_MODEL,
             "messages": messages,
-            "stream": True
-        }
+            "stream": OLLAMA_STREAM,
+        },
+        timeout=OLLAMA_TIMEOUT,
     )
 
     if response.status_code == 200:

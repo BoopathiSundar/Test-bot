@@ -3,12 +3,11 @@ import requests
 import json, os
 from database import save_chat, get_connection, list_sessions, clear_chat1, delete_session
 import uuid
+from ollama_config import OLLAMA_URL, OLLAMA_MODEL, OLLAMA_TIMEOUT, OLLAMA_STREAM
 
 session_id = str(uuid.uuid4())
 
 app = Flask(__name__)
-
-OLLAMA_URL = "http://localhost:11434/api/chat"
 
 @app.route("/")
 def home():
@@ -23,32 +22,49 @@ def chat_stream():
 
     def generate():
         full_reply = ""
-        response = requests.post(
-            OLLAMA_URL,
-            json={
-                "model": "llama3.2",
-                "messages": messages,
-                "stream": True
-            },
-            stream=True
-        )
 
-        for line in response.iter_lines():
+        try:
+            response = requests.post(
+                OLLAMA_URL,
+                json={
+                    "model": OLLAMA_MODEL,
+                    "messages": messages,
+                    "stream": OLLAMA_STREAM
+                },
+                stream=True,
+                timeout=OLLAMA_TIMEOUT
+            )
 
-            if not line:
-                continue
+            response.raise_for_status()
 
-            chunk = json.loads(line)
+            for line in response.iter_lines():
 
-            if "message" in chunk:
-                text = chunk["message"]["content"]
+                if not line:
+                    continue
 
-                full_reply += text
+                chunk = json.loads(line)
 
-                yield text
+                if "error" in chunk:
+                    yield f"\n[Error: {chunk['error']}]"
+                    break
+
+                if "message" in chunk:
+                    text = chunk["message"]["content"]
+
+                    full_reply += text
+
+                    yield text
+
+        except requests.exceptions.ConnectionError:
+            yield ("\n[Error: Could not connect to Ollama at "
+                   + OLLAMA_URL + ". Is the Ollama server running?]")
+        except requests.exceptions.Timeout:
+            yield "\n[Error: Ollama request timed out.]"
+        except Exception as exc:
+            yield f"\n[Error: {exc}]"
 
         save_chat(session_id, messages, full_reply)
-    
+
     return Response(generate(), mimetype="text/plain")
 
 @app.route("/sessions", methods=["GET"])
@@ -98,11 +114,12 @@ def chat():
     response = requests.post(
         OLLAMA_URL,
         json={
-            "model": "llama3.2",
+            "model": OLLAMA_MODEL,
             "messages": messages,
-            "stream": True
+            "stream": OLLAMA_STREAM
         },
-        stream=True
+        stream=True,
+        timeout=OLLAMA_TIMEOUT
     )
 
     bot_reply = ""
