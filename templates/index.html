@@ -3,101 +3,76 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sample Bot</title>
+    <title>AI Chat</title>
 
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <!-- Markdown rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- Syntax highlighting for code blocks -->
+    <link rel="stylesheet"
+          href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 </head>
-<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <body>
 
 <div class="container">
 
     <!-- Left Sidebar -->
-    <div class="sidebar">
+    <aside class="sidebar" id="sidebar">
 
-        <h2>Chat History</h2>
+        <div class="sidebar-header">
+            <h2>Chats</h2>
+        </div>
 
-        <button id="newChatBtn" onclick="startNewChat()">
-            + New Chat
-        </button>
+        <button id="newChatBtn" onclick="startNewChat()">＋ New Chat</button>
 
         <div id="sessions"></div>
 
-        <button id="clearBtn" onclick="clearChat()">
-            + Clear Chat1
-        </button>
+        <div class="sidebar-footer">
+            <button id="clearBtn" onclick="clearChat()">🗑 Clear all chats</button>
+        </div>
 
-         <div class="sessions-container">
+    </aside>
 
-            {% for session in sessions %}
+    <!-- Right Side -->
+    <div class="main">
 
-            <div class="session-item"
-                onclick="loadChat('{{ session[0] }}')">
+        <header class="chat-header">
+            <button id="sidebarToggle" onclick="toggleSidebar()" aria-label="Toggle sidebar">☰</button>
+            <h2 id="chatTitle">New chat</h2>
+        </header>
 
-                <span class="session-name">
-                    {{ session[1] }}
-                </span>
+        <!-- Chat Messages -->
+        <div class="chat-scroll">
+            <div id="chatbox"></div>
+        </div>
 
-                <button class="session-menu-btn"
-                        onclick="showSessionMenu(event, '{{ session[0] }}')">
-                    ⋯
-                </button>
-
+        <!-- Input -->
+        <div class="input-area">
+            <div class="input-shell">
+                <input
+                    type="text"
+                    id="message"
+                    placeholder="Ask anything..."
+                    autocomplete="off"
+                    onkeydown="if(event.key==='Enter') sendMessage();"
+                >
+                <button id="sendBtn" onclick="sendMessage()">Send</button>
             </div>
+        </div>
+        <div class="hint">&#8203;</div>
 
-            {% endfor %}
+    </div>
 
 </div>
 
 <!-- Context menu -->
 <div id="sessionMenu" class="session-menu">
-
-    <button onclick="renameSelectedSession()">
-        ✏️ Rename
-    </button>
-
-    <button class="delete-option"
-            onclick="deleteSelectedSession()">
-        🗑 Delete
-    </button>
-
-</div>
-
-    </div>
-
-    <!-- Right Side -->
-    <div class="main">
-
-        <!-- Chat Messages -->
-        <div id="chatbox"></div>
-
-        <!-- Input -->
-        <div class="input-area">
-
-            <input
-                type="text"
-                id="message"
-                placeholder="Type your message..."
-                onkeypress="if(event.key==='Enter') sendMessage();"
-            >
-
-            <button onclick="sendMessage()">Send</button>
-
-        </div>
-
-    </div>
-
+    <button onclick="renameSelectedSession()">✏️ Rename</button>
+    <button class="delete-option" onclick="deleteSelectedSession()">🗑 Delete</button>
 </div>
 
 <script src="{{ url_for('static', filename='script.js') }}"></script>
-
-<script>
-window.onload = function () {
-    if (typeof loadSessions === "function") {
-        loadSessions();
-    }
-};
-</script>
 
 </body>
 </html>

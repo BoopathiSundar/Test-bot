@@ -1,113 +1,17 @@
-async function sendMessage() {
+/* ===============================
+   AI Chat - frontend logic
+   =============================== */
 
-    let message = document.getElementById("message").value;
+let currentSessionId = null;
+let selectedSessionId = null;
+let renameInputEl = null;
 
-    let chatBox = document.getElementById("chatbox");
-    
-    chatBox.innerHTML +=
-        "<div class='user'>" + message + "</div>";
+/* ---------- Helpers ---------- */
 
-    document.getElementById("message").value = "";
-
-    // Create an empty bot message
-    let botDiv = document.createElement("div");
-
-    botDiv.className = "bot";
-
-    botDiv.innerHTML = "";
-
-    chatBox.appendChild(botDiv);
-
-    const response = await fetch("/chat-stream", {
-
-        method: "POST",
-
-        headers: {
-            "Content-Type": "application/json"
-        },
-
-        body: JSON.stringify({
-            messages: [
-                {
-                    role: "user",
-                    content: message
-                }
-            ]
-        })
-
-    });
-
-    const reader = response.body.getReader();
-
-    const decoder = new TextDecoder();
-
-    let fullResponse = "";
-
-    while (true) {
-
-        const { value, done } = await reader.read();
-
-        if (done)
-            break;
-
-        const chunk = decoder.decode(value);
-
-        botDiv.innerHTML += chunk;
-
-        //botDiv.innerHTML = marked.parse(fullResponse);
-
-        chatBox.scrollTop = chatBox.scrollHeight;
-    }
-
-}
-
-function loadSessions() {
-    fetch("/sessions")
-        .then(response => response.json())
-        .then(sessions => {
-            //console.log(sessions)
-            const sidebar = document.getElementById("sessions");
-            console.log(typeof(sidebar))
-            sidebar.innerHTML = "";
-
-            sessions.forEach(session => {
-
-                const item = document.createElement("div");
-                item.className = "session-item";
-
-                const name = document.createElement("span");
-
-                name.className = "session-name";
-                name.innerText = session[1];
-
-                if (isJson(session[1])) {
-
-                    const jsonData = JSON.parse(session[1]);
-
-                    if (jsonData.length > 0 && jsonData[0].content) {
-                        name.innerText = jsonData[0].content;
-                    }
-                }
-
-                const menuButton = document.createElement("button");
-
-                menuButton.className = "session-menu-btn";
-                menuButton.innerText = "⋯";
-
-                name.onclick = () => {
-                    loadSession(session[0]);
-                };
-
-                menuButton.onclick = (event) => {
-                    showSessionMenu(event, session[0]);
-                };
-
-                item.appendChild(name);
-                item.appendChild(menuButton);
-
-                sidebar.appendChild(item);
-            });
-        });
+function escapeHtml(str) {
+    const div = document.createElement("div");
+    div.textContent = str == null ? "" : String(str);
+    return div.innerHTML;
 }
 
 function isJson(value) {
@@ -119,151 +23,437 @@ function isJson(value) {
     }
 }
 
+function scrollToBottom() {
+    const scroller = document.querySelector(".chat-scroll");
+    if (scroller) scroller.scrollTop = scroller.scrollHeight;
+}
+
+/* ---------- Markdown + code rendering ---------- */
+
+function renderMarkdown(text) {
+    if (window.marked && typeof marked.parse === "function") {
+        return marked.parse(text || "");
+    }
+    return escapeHtml(text).replace(/\n/g, "<br>");
+}
+
+function highlightCode(root) {
+    if (window.hljs) {
+        root.querySelectorAll("pre code").forEach(function (block) {
+            try {
+                hljs.highlightElement(block);
+            } catch (e) {
+                /* ignore highlight failures */
+            }
+        });
+    }
+}
+
+function attachCopyButtons(root) {
+    root.querySelectorAll("pre").forEach(function (pre) {
+        const code = pre.querySelector("code");
+        if (!code) return;
+
+        // Avoid adding duplicate buttons after re-render during streaming.
+        if (pre.querySelector(".copy-code-btn")) return;
+
+        const btn = document.createElement("button");
+        btn.className = "copy-code-btn";
+        btn.type = "button";
+        btn.innerText = "Copy code";
+
+        btn.addEventListener("click", async function () {
+            try {
+                await navigator.clipboard.writeText(code.innerText.trim());
+                btn.innerText = "Copied!";
+                btn.classList.add("copied");
+                setTimeout(function () {
+                    btn.innerText = "Copy code";
+                    btn.classList.remove("copied");
+                }, 2000);
+            } catch (e) {
+                btn.innerText = "Copy failed";
+            }
+        });
+
+        pre.appendChild(btn);
+    });
+}
+
+/* ---------- Message building ---------- */
+
+function buildUserRow(text) {
+    const row = document.createElement("div");
+    row.className = "message-row user";
+
+    const content = document.createElement("div");
+    content.className = "message-content";
+    content.textContent = text;
+
+    const avatar = document.createElement("div");
+    avatar.className = "avatar user";
+    avatar.innerText = "🧑";
+
+    row.append(content, avatar);
+    return row;
+}
+
+function buildBotRow(text) {
+    const row = document.createElement("div");
+    row.className = "message-row bot";
+
+    const avatar = document.createElement("div");
+    avatar.className = "avatar bot";
+    avatar.innerText = "🤖";
+
+    const content = document.createElement("div");
+    content.className = "message-content";
+    const md = document.createElement("div");
+    md.className = "md-body";
+    md.innerHTML = renderMarkdown(text);
+    highlightCode(md);
+    attachCopyButtons(md);
+
+    content.appendChild(md);
+    row.append(avatar, content);
+    return row;
+}
+
+/* ---------- Send / streaming ---------- */
+
+async function sendMessage() {
+    const input = document.getElementById("message");
+    const message = input.value.trim();
+    if (!message) return;
+
+    const sendBtn = document.getElementById("sendBtn");
+    const chatBox = document.getElementById("chatbox");
+    const chatTitle = document.getElementById("chatTitle");
+
+    sendBtn.disabled = true;
+    input.disabled = true;
+    input.value = "";
+
+    if (chatTitle) {
+        chatTitle.innerText =
+            message.length > 30 ? message.slice(0, 30) + "…" : message;
+    }
+
+    chatBox.appendChild(buildUserRow(message));
+
+    // Empty bot row filled as tokens stream in.
+    const botRow = document.createElement("div");
+    botRow.className = "message-row bot typing";
+    const botAvatar = document.createElement("div");
+    botAvatar.className = "avatar bot";
+    botAvatar.innerText = "🤖";
+    const botContent = document.createElement("div");
+    botContent.className = "message-content";
+    const mdBody = document.createElement("div");
+    mdBody.className = "md-body";
+    botContent.appendChild(mdBody);
+    botRow.append(botAvatar, botContent);
+    chatBox.appendChild(botRow);
+    scrollToBottom();
+
+    let fullResponse = "";
+
+    try {
+        const response = await fetch("/chat-stream", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                messages: [{ role: "user", content: message }]
+            })
+        });
+
+        if (!response.ok || !response.body) {
+            throw new Error("Request failed with status " + response.status);
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+
+        while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            fullResponse += decoder.decode(value, { stream: true });
+            mdBody.innerHTML = renderMarkdown(fullResponse);
+            highlightCode(mdBody);
+            attachCopyButtons(mdBody);
+            scrollToBottom();
+        }
+    } catch (err) {
+        mdBody.innerHTML = escapeHtml("[Error: " + err.message + "]");
+    }
+
+    botRow.classList.remove("typing");
+    sendBtn.disabled = false;
+    input.disabled = false;
+    input.focus();
+    scrollToBottom();
+
+    // Refresh the session list so the new/updated chat appears.
+    loadSessions();
+}
+
+/* ---------- Session list ---------- */
+
+function getSessionDisplayName(session) {
+    let label = session[1];
+    if (isJson(label)) {
+        try {
+            const jsonData = JSON.parse(label);
+            if (Array.isArray(jsonData) && jsonData.length && jsonData[0].content) {
+                label = jsonData[0].content;
+            }
+        } catch (e) { /* keep original label */ }
+    }
+    return (label && String(label).trim()) ? String(label) : "Untitled";
+}
+
+function loadSessions() {
+    fetch("/sessions")
+        .then(response => response.json())
+        .then(sessions => {
+            const sidebar = document.getElementById("sessions");
+            sidebar.innerHTML = "";
+
+            sessions.forEach(session => {
+                const item = document.createElement("div");
+                item.className = "session-item";
+                item.dataset.id = session[0];
+                if (session[0] === currentSessionId) {
+                    item.classList.add("active");
+                }
+
+                const name = document.createElement("span");
+                name.className = "session-name";
+                name.innerText = getSessionDisplayName(session);
+                name.title = name.innerText;
+                name.onclick = () => loadSession(session[0]);
+
+                const menuButton = document.createElement("button");
+                menuButton.className = "session-menu-btn";
+                menuButton.innerText = "⋯";
+                menuButton.onclick = (event) => showSessionMenu(event, session[0]);
+
+                item.appendChild(name);
+                item.appendChild(menuButton);
+                sidebar.appendChild(item);
+            });
+        })
+        .catch(err => console.error("loadSessions error:", err));
+}
+
+/* ---------- Load one session ---------- */
+
 function loadSession(sessionId) {
+    currentSessionId = sessionId;
 
     fetch("/session/" + sessionId)
         .then(response => response.json())
         .then(chats => {
-
-            const chatBox = document.getElementById("chatbox"); // Your chat container
+            const chatBox = document.getElementById("chatbox");
             chatBox.innerHTML = "";
-            userArrMessage = ""
-            chats.forEach(chat => {
-                
-                if (isJson(chat[0])) {
-                    chatBox.innerHTML += `
-                    <div class="user-message">
-                        ${JSON.parse(chat[0])[0].content}
-                    </div>
-                `;
-                } else {
-                // User message
-                chatBox.innerHTML += `
-                    <div class="user-message">
-                        ${chat[0]}
-                    </div>
-                `;
+            const chatTitle = document.getElementById("chatTitle");
+
+            chats.forEach((chat, index) => {
+                let user = chat[0];
+                if (isJson(user)) {
+                    try {
+                        const arr = JSON.parse(user);
+                        if (Array.isArray(arr) && arr.length && arr[0].content) {
+                            user = arr[0].content;
+                        }
+                    } catch (e) { /* keep raw */ }
                 }
 
-                // Bot response
-                chatBox.innerHTML += `
-                    <div class="bot-message">
-                        ${chat[1]}
-                    </div>
-                `;
+                if (index === 0 && chatTitle && user) {
+                    const t = String(user);
+                    chatTitle.innerText = t.length > 40 ? t.slice(0, 40) + "…" : t;
+                }
+
+                chatBox.appendChild(buildUserRow(user));
+                chatBox.appendChild(buildBotRow(chat[1]));
             });
 
-            // Scroll to the bottom
-            chatBox.scrollTop = chatBox.scrollHeight;
-        });
+            scrollToBottom();
+            loadSessions();
+        })
+        .catch(err => console.error("loadSession error:", err));
 }
+
+/* ---------- New chat ---------- */
 
 function startNewChat() {
-
     currentSessionId = crypto.randomUUID();
 
-    // Clear the chat window
-    document.getElementById("chatbox").innerHTML = "";
+    const chatBox = document.getElementById("chatbox");
+    if (chatBox) chatBox.innerHTML = "";
 
-    // Clear the input
-    document.getElementById("message").value = "";
+    const chartTitle = document.getElementById("chatTitle");
+    if (chartTitle) chartTitle.innerText = "New chat";
 
-    // Optional: reload the sidebar
+    const input = document.getElementById("message");
+    if (input) {
+        input.value = "";
+        input.disabled = false;
+        input.focus();
+    }
+
+    const sendBtn = document.getElementById("sendBtn");
+    if (sendBtn) sendBtn.disabled = false;
+
     loadSessions();
+    closeSidebar();
 }
 
-function clearChat(){
-    fetch("/clear-chat",  {
+/* ---------- Clear all chats ---------- */
 
-        method: "DELETE"
-        })
+function clearChat() {
+    fetch("/clear-chat", { method: "DELETE" })
         .then(response => {
-        if (!response.ok) {
-            throw new Error("HTTP Error: " + response.status);
-        }
-        return response.json();
-    })
-    .then(data => {
-        console.log("Response:", data);
-    })
-    .catch(error => {
-        console.error("Error:", error);
-    });
+            if (!response.ok) throw new Error("HTTP Error: " + response.status);
+            return response.json();
+        })
+        .then(() => {
+            const chatBox = document.getElementById("chatbox");
+            if (chatBox) chatBox.innerHTML = "";
+            const chartTitle = document.getElementById("chatTitle");
+            if (chartTitle) chartTitle.innerText = "New chat";
+            loadSessions();
+        })
+        .catch(error => console.error("clearChat error:", error));
 }
+
+/* ---------- Single-session delete (kept for compatibility) ---------- */
 
 async function deleteSession(sessionId) {
-
-    const response = await fetch(
-        "/delete_session/" + sessionId,
-        {
-            method: "DELETE"
-        }
-    );
-
+    const response = await fetch("/delete_session/" + sessionId, {
+        method: "DELETE"
+    });
     const data = await response.json();
-
     if (data.success) {
-        location.reload();
+        if (currentSessionId === sessionId) {
+            startNewChat();
+        } else {
+            loadSessions();
+        }
     }
 }
 
-let selectedSessionId = null;
+/* ---------- Session context menu ---------- */
 
 function showSessionMenu(event, sessionId) {
-
     event.stopPropagation();
-
     selectedSessionId = sessionId;
 
     const menu = document.getElementById("sessionMenu");
-
     menu.style.display = "block";
-
     menu.style.left = event.clientX + "px";
     menu.style.top = event.clientY + "px";
 }
 
+// Close the context menu when clicking anywhere else.
 document.addEventListener("click", function () {
+    const menu = document.getElementById("sessionMenu");
+    if (menu) menu.style.display = "none";
+});
+
+/* ---------- Rename session (inline) ---------- */
+
+async function renameSelectedSession() {
+    if (!selectedSessionId) return;
+    document.getElementById("sessionMenu").style.display = "none";
+
+    const item = document.querySelector(
+        '#sessions .session-item[data-id="' + selectedSessionId + '"]'
+    );
+    if (!item) return;
+
+    const nameSpan = item.querySelector(".session-name");
+    const currentText = nameSpan ? nameSpan.innerText : "Untitled";
+
+    const input = document.createElement("input");
+    input.className = "session-rename-input";
+    input.value = currentText;
+
+    nameSpan.replaceWith(input);
+    renameInputEl = input;
+    input.focus();
+    input.select();
+
+    const commitRename = async () => {
+        if (renameInputEl !== input) return;
+        renameInputEl = null;
+
+        const newName = input.value.trim();
+        if (newName && newName !== currentText) {
+            try {
+                await fetch("/rename_session/" + selectedSessionId, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ name: newName })
+                });
+            } catch (e) {
+                console.error("rename error:", e);
+            }
+        }
+        loadSessions();
+    };
+
+    input.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") {
+            e.preventDefault();
+            commitRename();
+        } else if (e.key === "Escape") {
+            renameInputEl = null;
+            loadSessions();
+        }
+    });
+
+    input.addEventListener("blur", commitRename);
+}
+
+/* ---------- Delete selected session ---------- */
+
+async function deleteSelectedSession() {
+    if (!selectedSessionId) return;
+
+    if (!confirm("Delete this chat?")) return;
+
+    const response = await fetch("/delete_session/" + selectedSessionId, {
+        method: "DELETE"
+    });
+    const data = await response.json();
 
     document.getElementById("sessionMenu").style.display = "none";
 
-});
-
-async function deleteSelectedSession() {
-
-    if (!selectedSessionId) {
-        return;
-    }
-
-    const confirmed = confirm("Delete this chat?");
-
-    if (!confirmed) {
-        return;
-    }
-
-    const response = await fetch(
-        `/delete_session/${selectedSessionId}`,
-        {
-            method: "DELETE"
-        }
-    );
-
-    const data = await response.json();
-
     if (data.success) {
-
-        document.getElementById("sessionMenu").style.display = "none";
-
-        // Reload session list
-        location.reload();
-
+        if (currentSessionId === selectedSessionId) {
+            startNewChat();
+        } else {
+            loadSessions();
+        }
     } else {
-
         alert("Unable to delete chat.");
-
     }
-
 }
+
+/* ---------- Responsive sidebar ---------- */
+
+function toggleSidebar() {
+    const sidebar = document.getElementById("sidebar");
+    if (sidebar) sidebar.classList.toggle("open");
+}
+
+function closeSidebar() {
+    const sidebar = document.getElementById("sidebar");
+    if (sidebar) sidebar.classList.remove("open");
+}
+
+/* ---------- Init ---------- */
 
 window.onload = function () {
     loadSessions();
