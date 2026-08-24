@@ -5,6 +5,7 @@
 let currentSessionId = null;
 let selectedSessionId = null;
 let renameInputEl = null;
+let archivedView = false;
 
 /* ---------- Helpers ---------- */
 
@@ -216,34 +217,65 @@ function loadSessions() {
     fetch("/sessions")
         .then(response => response.json())
         .then(sessions => {
-            const sidebar = document.getElementById("sessions");
-            sidebar.innerHTML = "";
-
-            sessions.forEach(session => {
-                const item = document.createElement("div");
-                item.className = "session-item";
-                item.dataset.id = session[0];
-                if (session[0] === currentSessionId) {
-                    item.classList.add("active");
-                }
-
-                const name = document.createElement("span");
-                name.className = "session-name";
-                name.innerText = getSessionDisplayName(session);
-                name.title = name.innerText;
-                name.onclick = () => loadSession(session[0]);
-
-                const menuButton = document.createElement("button");
-                menuButton.className = "session-menu-btn";
-                menuButton.innerText = "⋯";
-                menuButton.onclick = (event) => showSessionMenu(event, session[0]);
-
-                item.appendChild(name);
-                item.appendChild(menuButton);
-                sidebar.appendChild(item);
-            });
+            renderSessionList(sessions);
         })
         .catch(err => console.error("loadSessions error:", err));
+}
+
+function loadArchivedSessions() {
+    fetch("/archived-chats")
+        .then(response => response.json())
+        .then(sessions => {
+            renderSessionList(sessions);
+        })
+        .catch(err => console.error("loadArchivedSessions error:", err));
+}
+
+function renderSessionList(sessions) {
+    const sidebar = document.getElementById("sessions");
+    sidebar.innerHTML = "";
+
+    if (!sessions || sessions.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "session-empty";
+        empty.innerText = archivedView ? "No archived chats" : "No chats yet";
+        sidebar.appendChild(empty);
+        return;
+    }
+
+    sessions.forEach(session => {
+        const item = document.createElement("div");
+        item.className = "session-item";
+        item.dataset.id = session[0];
+        item.dataset.pinned = session[3] || 0;
+        item.dataset.archived = session[4] || 0;
+        if (session[0] === currentSessionId) {
+            item.classList.add("active");
+        }
+
+        const name = document.createElement("span");
+        name.className = "session-name";
+        name.innerText = getSessionDisplayName(session);
+        name.title = name.innerText;
+        name.onclick = () => loadSession(session[0]);
+
+        const pinBadge = document.createElement("span");
+        pinBadge.className = "pin-badge";
+        pinBadge.innerText = "📌";
+        pinBadge.title = "Pinned";
+        if (String(session[3]) === "1" || session[3] === 1) {
+            item.appendChild(pinBadge);
+        }
+
+        const menuButton = document.createElement("button");
+        menuButton.className = "session-menu-btn";
+        menuButton.innerText = "⋯";
+        menuButton.onclick = (event) => showSessionMenu(event, session[0]);
+
+        item.appendChild(name);
+        item.appendChild(menuButton);
+        sidebar.appendChild(item);
+    });
 }
 
 /* ---------- Load one session ---------- */
@@ -349,6 +381,21 @@ function showSessionMenu(event, sessionId) {
     event.stopPropagation();
     selectedSessionId = sessionId;
 
+    const item = document.querySelector(
+        '#sessions .session-item[data-id="' + sessionId + '"]'
+    );
+    const isPinned = item && String(item.dataset.pinned) === "1";
+    const isArchived = item && String(item.dataset.archived) === "1";
+
+    const pinBtn = document.getElementById("menuPinBtn");
+    const archiveBtn = document.getElementById("menuArchiveBtn");
+    if (pinBtn) pinBtn.innerText = isPinned ? "📌 Unpin" : "📌 Pin";
+    if (archiveBtn) {
+        archiveBtn.innerText = (archivedView || isArchived)
+            ? "📤 Unarchive"
+            : "🗄 Archive";
+    }
+
     const menu = document.getElementById("sessionMenu");
     menu.style.display = "block";
     menu.style.left = event.clientX + "px";
@@ -439,6 +486,76 @@ async function deleteSelectedSession() {
     } else {
         alert("Unable to delete chat.");
     }
+}
+
+/* ---------- Pin / Archive ---------- */
+
+function toggleArchivedView() {
+    archivedView = !archivedView;
+    const btn = document.getElementById("archivedBtn");
+    if (btn) {
+        btn.classList.toggle("active", archivedView);
+        btn.innerText = archivedView ? "💬 Chats" : "🗄 Archived";
+    }
+    if (archivedView) {
+        loadArchivedSessions();
+    } else {
+        loadSessions();
+    }
+}
+
+function refreshList() {
+    if (archivedView) {
+        loadArchivedSessions();
+    } else {
+        loadSessions();
+    }
+}
+
+async function pinSelectedSession() {
+    if (!selectedSessionId) return;
+
+    const item = document.querySelector(
+        '#sessions .session-item[data-id="' + selectedSessionId + '"]'
+    );
+    const isPinned = item && String(item.dataset.pinned) === "1";
+
+    document.getElementById("sessionMenu").style.display = "none";
+
+    const url = isPinned
+        ? "/unpin_chat/" + selectedSessionId
+        : "/pin_chat/" + selectedSessionId;
+
+    try {
+        await fetch(url, { method: "POST" });
+    } catch (e) {
+        console.error("pin toggle error:", e);
+    }
+
+    refreshList();
+}
+
+async function archiveSelectedSession() {
+    if (!selectedSessionId) return;
+
+    const item = document.querySelector(
+        '#sessions .session-item[data-id="' + selectedSessionId + '"]'
+    );
+    const isArchived = item && String(item.dataset.archived) === "1";
+
+    document.getElementById("sessionMenu").style.display = "none";
+
+    const url = (archivedView || isArchived)
+        ? "/unarchive_chat/" + selectedSessionId
+        : "/archive_chat/" + selectedSessionId;
+
+    try {
+        await fetch(url, { method: "POST" });
+    } catch (e) {
+        console.error("archive toggle error:", e);
+    }
+
+    refreshList();
 }
 
 /* ---------- Responsive sidebar ---------- */

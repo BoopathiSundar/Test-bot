@@ -29,6 +29,7 @@
         <div id="sessions"></div>
 
         <div class="sidebar-footer">
+            <button id="archivedBtn" onclick="toggleArchivedView()">🗄 Archived</button>
             <button id="clearBtn" onclick="clearChat()">🗑 Clear all chats</button>
         </div>
 
@@ -68,6 +69,8 @@
 
 <!-- Context menu -->
 <div id="sessionMenu" class="session-menu">
+    <button id="menuPinBtn" onclick="pinSelectedSession()">📌 Pin</button>
+    <button id="menuArchiveBtn" onclick="archiveSelectedSession()">🗄 Archive</button>
     <button onclick="renameSelectedSession()">✏️ Rename</button>
     <button class="delete-option" onclick="deleteSelectedSession()">🗑 Delete</button>
 </div>

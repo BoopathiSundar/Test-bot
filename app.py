@@ -1,7 +1,7 @@
 from flask import Flask, render_template, request, jsonify, Response
 import requests
 import json, os
-from database import save_chat, get_connection, list_sessions, clear_chat1, delete_session
+from database import save_chat, get_connection, list_sessions, clear_chat1, delete_session, list_archived_sessions, set_session_pinned, set_session_archived
 import uuid
 from ollama_config import OLLAMA_URL, OLLAMA_MODEL, OLLAMA_TIMEOUT, OLLAMA_STREAM
 
@@ -199,6 +199,30 @@ def rename_session(session_id):
     return jsonify({
         "success": True
     })
+
+@app.route("/pin_chat/<session_id>", methods=["POST"])
+def pin_chat(session_id):
+    set_session_pinned(session_id, 1)
+    return jsonify({"success": True, "pinned": True})
+
+@app.route("/unpin_chat/<session_id>", methods=["POST"])
+def unpin_chat(session_id):
+    set_session_pinned(session_id, 0)
+    return jsonify({"success": True, "pinned": False})
+
+@app.route("/archive_chat/<session_id>", methods=["POST"])
+def archive_chat(session_id):
+    set_session_archived(session_id, 1)
+    return jsonify({"success": True, "archived": True})
+
+@app.route("/unarchive_chat/<session_id>", methods=["POST"])
+def unarchive_chat(session_id):
+    set_session_archived(session_id, 0)
+    return jsonify({"success": True, "archived": False})
+
+@app.route("/archived-chats", methods=["GET"])
+def get_archived_chats():
+    return jsonify(list_archived_sessions())
 
 if __name__ == "__main__":
     app.run(debug=True)

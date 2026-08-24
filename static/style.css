@@ -505,6 +505,23 @@ body {
     cursor: not-allowed;
 }
 
+/* Pin badge in sidebar */
+.pin-badge {
+    margin-right: 6px;
+    font-size: 12px;
+    display: inline-block;
+}
+
+/* Archived toggle button (active state) */
+#archivedBtn.active {
+    background: var(--sidebar-hover);
+    color: var(--accent);
+}
+
+#archivedBtn {
+    border-radius: 8px;
+}
+
 .hint {
     text-align: center;
     font-size: 12px;
