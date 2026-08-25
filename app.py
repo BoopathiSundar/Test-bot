@@ -7,10 +7,25 @@ from ollama_config import OLLAMA_URL, OLLAMA_MODEL, OLLAMA_TIMEOUT, OLLAMA_STREA
 
 session_id = str(uuid.uuid4())
 
-app = Flask(__name__)
+# Base directory of this file, used to locate the built Angular frontend.
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+FRONTEND_DIST = os.path.join(BASE_DIR, "frontend", "dist", "frontend", "browser")
+
+# Serve static assets from the built Angular app when it exists, otherwise
+# fall back to the legacy static/ folder. API endpoints are unaffected.
+app = Flask(
+    __name__,
+    static_folder=FRONTEND_DIST if os.path.isdir(FRONTEND_DIST) else "static",
+)
 
 @app.route("/")
 def home():
+    # Serve the compiled Angular single-page app when available.
+    if os.path.isdir(FRONTEND_DIST) and os.path.exists(
+        os.path.join(FRONTEND_DIST, "index.html")
+    ):
+        return app.send_static_file("index.html")
+    # Fallback to the original template when the frontend is not built.
     return render_template("index.html")
 
 @app.route("/chat-stream", methods=["POST"])

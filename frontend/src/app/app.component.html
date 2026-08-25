@@ -1,0 +1,18 @@
+<div class="app-shell">
+  <app-sidebar
+    [currentSessionId]="selectedSessionId"
+    (sessionSelected)="onSessionSelected($event)"
+  ></app-sidebar>
+
+  <main class="main-placeholder">
+    <section class="placeholder-card">
+      <h1>AI Chat</h1>
+      <p>
+        <ng-container *ngIf="selectedSessionId; else noSelection">
+          Selected session: <code>{{ selectedSessionId }}</code>
+        </ng-container>
+        <ng-template #noSelection>Select a chat from the sidebar.</ng-template>
+      </p>
+    </section>
+  </main>
+</div>

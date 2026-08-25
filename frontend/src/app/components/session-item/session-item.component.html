@@ -1,0 +1,39 @@
+<div class="session-item" [class.active]="current">
+  <span class="pin-badge" *ngIf="session.isPinned" title="Pinned">📌</span>
+
+  <ng-container *ngIf="!editing">
+    <span class="session-name" (click)="onSelect()" [title]="displayName">
+      {{ displayName }}
+    </span>
+    <button
+      class="session-menu-btn"
+      (click)="showMenu($event)"
+      title="Options">⋯</button>
+  </ng-container>
+
+  <ng-container *ngIf="editing">
+    <input
+      class="session-rename-input"
+      [(ngModel)]="newName"
+      (keydown.enter)="commitRename()"
+      (keydown.escape)="cancelRename()"
+      (blur)="commitRename()"
+    >
+  </ng-container>
+</div>
+
+<div
+  class="session-menu"
+  *ngIf="menuOpen"
+  [style.left.px]="menuLeft"
+  [style.top.px]="menuTop"
+  [style.display]="'block'">
+  <button (click)="togglePin()">
+    {{ session.isPinned ? '📌 Unpin' : '📌 Pin' }}
+  </button>
+  <button (click)="toggleArchive()">
+    {{ (archivedView || session.isArchived) ? '📤 Unarchive' : '🗄 Archive' }}
+  </button>
+  <button (click)="startRename()">✏️ Rename</button>
+  <button class="delete-option" (click)="delete()">🗑 Delete</button>
+</div>

@@ -1,0 +1,35 @@
+<div class="chat-scroll" #scroller>
+  <div id="chatbox">
+    <ng-container *ngFor="let msg of messages">
+      <!-- User message -->
+      <div class="message-row user" *ngIf="msg.role === 'user'">
+        <div class="message-content">{{ msg.content }}</div>
+        <div class="avatar user">🧑</div>
+      </div>
+
+      <!-- Bot message (markdown) -->
+      <div class="message-row bot" *ngIf="msg.role === 'assistant'">
+        <div class="avatar bot">🤖</div>
+        <div class="message-content" [class.typing]="msg.streaming">
+          <div class="md-body" [appMarkdown]="msg.content"></div>
+        </div>
+      </div>
+    </ng-container>
+  </div>
+</div>
+
+<div class="input-area">
+  <div class="input-shell">
+    <input
+      id="message"
+      [(ngModel)]="input"
+      placeholder="Ask anything..."
+      autocomplete="off"
+      [disabled]="busy"
+      (keydown.enter)="send()"
+    >
+    <button id="sendBtn" (click)="send()" [disabled]="busy || !input.trim()">
+      Send
+    </button>
+  </div>
+</div>

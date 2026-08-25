@@ -1,0 +1,70 @@
+<aside class="sidebar">
+  <div class="sidebar-header">
+    <h2>Chats</h2>
+  </div>
+
+  <button id="newChatBtn" type="button">＋ New Chat</button>
+
+  <div id="sessions" class="session-list">
+    <!-- Loading state -->
+    <div *ngIf="loading" class="session-empty">Loading…</div>
+
+    <!-- Empty state -->
+    <div *ngIf="!loading && sessions.length === 0" class="session-empty">
+      No chats yet
+    </div>
+
+    <!-- Session items -->
+    <div
+      *ngFor="let session of sessions"
+      class="session-item"
+      [class.active]="session.id === currentSessionId"
+    >
+      <!-- Inline rename input -->
+      <ng-container *ngIf="renamingId === session.id; else staticRow">
+        <input
+          class="sidebar-rename-input"
+          [(ngModel)]="renameValue"
+          (keydown.enter)="commitRename()"
+          (keydown.escape)="cancelRename()"
+          (blur)="commitRename()"
+          (click)="$event.stopPropagation()"
+        >
+      </ng-container>
+
+      <!-- Normal row -->
+      <ng-template #staticRow>
+        <span
+          class="session-name"
+          [title]="displayName(session)"
+          (click)="selectSession(session.id)"
+        >{{ displayName(session) }}</span>
+        <button
+          class="session-menu-btn"
+          type="button"
+          title="Options"
+          (click)="openMenu($event, session.id)"
+        >⋯</button>
+      </ng-template>
+    </div>
+  </div>
+
+  <!-- Context menu (positioned at click point) -->
+  <div
+    *ngIf="menuVisible && menuSessionId"
+    class="sidebar-context-menu"
+    [style.left.px]="menuLeft"
+    [style.top.px]="menuTop"
+    (click)="$event.stopPropagation()"
+  >
+    <button
+      type="button"
+      (click)="startRename(getSessionById(menuSessionId))"
+    >✏️ Rename</button>
+    <button
+      type="button"
+      class="delete-option"
+      (click)="deleteSession(menuSessionId)"
+    >🗑 Delete</button>
+  </div>
+</aside>

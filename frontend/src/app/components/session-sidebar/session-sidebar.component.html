@@ -1,0 +1,32 @@
+<aside class="sidebar" id="sidebar" [class.open]="open">
+  <div class="sidebar-header">
+    <h2>Chats</h2>
+  </div>
+
+  <button id="newChatBtn" (click)="onNewChat()">＋ New Chat</button>
+
+  <div id="sessions">
+    <app-session-item
+      *ngFor="let s of sessions"
+      [session]="s"
+      [current]="s.id === currentSessionId"
+      [archivedView]="archivedView"
+      (select)="onSelect($event)"
+      (changed)="reload()"
+    ></app-session-item>
+
+    <div *ngIf="sessions.length === 0" class="session-empty">
+      {{ archivedView ? 'No archived chats' : 'No chats yet' }}
+    </div>
+  </div>
+
+  <div class="sidebar-footer">
+    <button
+      id="archivedBtn"
+      [class.active]="archivedView"
+      (click)="toggleArchived()">
+      {{ archivedView ? '💬 Chats' : '🗄 Archived' }}
+    </button>
+    <button id="clearBtn" (click)="onClearAll()">🗑 Clear all chats</button>
+  </div>
+</aside>
