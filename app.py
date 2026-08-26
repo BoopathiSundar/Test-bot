@@ -10,7 +10,7 @@ session_id = str(uuid.uuid4())
 # Base directory of this file, used to locate the built Angular frontend.
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FRONTEND_DIST = os.path.join(BASE_DIR, "frontend", "dist", "frontend", "browser")
-
+print(FRONTEND_DIST)
 # Serve static assets from the built Angular app when it exists, otherwise
 # fall back to the legacy static/ folder. API endpoints are unaffected.
 app = Flask(
@@ -21,6 +21,7 @@ app = Flask(
 @app.route("/")
 def home():
     # Serve the compiled Angular single-page app when available.
+    
     if os.path.isdir(FRONTEND_DIST) and os.path.exists(
         os.path.join(FRONTEND_DIST, "index.html")
     ):
