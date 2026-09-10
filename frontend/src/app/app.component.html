@@ -2,17 +2,38 @@
   <app-sidebar
     [currentSessionId]="selectedSessionId"
     (sessionSelected)="onSessionSelected($event)"
+    (chatLoaded)="onChatLoaded($event)"
+    (newChat)="onNewChat()"
   ></app-sidebar>
 
   <main class="main-placeholder">
-    <section class="placeholder-card">
+    <section *ngIf="!selectedSessionId" class="placeholder-card">
       <h1>AI Chat</h1>
-      <p>
-        <ng-container *ngIf="selectedSessionId; else noSelection">
-          Selected session: <code>{{ selectedSessionId }}</code>
-        </ng-container>
-        <ng-template #noSelection>Select a chat from the sidebar.</ng-template>
-      </p>
+      <p>Select a chat from the sidebar or start a new one.</p>
+    </section>
+
+    <section *ngIf="selectedSessionId" class="chat-reader">
+      <header class="reader-header">
+        <h2>Chat</h2>
+        <code title="Session ID">{{ selectedSessionId }}</code>
+      </header>
+
+      <div *ngIf="sessionMessages.length === 0" class="reader-empty">
+        No messages yet.
+      </div>
+
+      <div class="reader-messages">
+        <div class="reader-pair" *ngFor="let message of sessionMessages">
+          <div class="reader-row user">
+            <strong>You</strong>
+            <p>{{ userText(message) }}</p>
+          </div>
+          <div class="reader-row bot">
+            <strong>AI</strong>
+            <p class="md-body">{{ message.bot }}</p>
+          </div>
+        </div>
+      </div>
     </section>
   </main>
 </div>

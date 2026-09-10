@@ -1,48 +1,98 @@
-/* Reusable ChatGPT-style sidebar */
+/* =========================================================
+   ChatGPT-style Sidebar
+   ========================================================= */
 
 :host {
   display: block;
   width: 260px;
-  flex-shrink: 0;
   height: 100vh;
+  flex: 0 0 260px;
+  min-width: 260px;
+  max-width: 260px;
+  box-sizing: border-box;
 }
+
+/* =========================================================
+   Sidebar
+   ========================================================= */
 
 .sidebar {
   display: flex;
   flex-direction: column;
+
   width: 260px;
   height: 100vh;
+
+  min-height: 0;
+  min-width: 0;
+
+  box-sizing: border-box;
+
   background: #171717;
   color: #ececec;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
-    Arial, sans-serif;
+
+  font-family:
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    Helvetica,
+    Arial,
+    sans-serif;
+
   border-right: 1px solid rgba(255, 255, 255, 0.08);
 }
+
+/* =========================================================
+   Header
+   ========================================================= */
 
 .sidebar-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+
+  flex-shrink: 0;
+
   padding: 14px;
 }
 
 .sidebar-header h2 {
+  margin: 0;
+
   font-size: 16px;
   font-weight: 600;
+  color: #ececec;
 }
 
-/* New Chat button */
+/* =========================================================
+   New Chat Button
+   ========================================================= */
+
 #newChatBtn {
+  display: block;
+
   width: calc(100% - 28px);
+
   margin: 0 14px 10px;
+
   padding: 12px;
+
+  box-sizing: border-box;
+
   background: transparent;
   color: #ececec;
+
   border: 1px solid rgba(255, 255, 255, 0.25);
   border-radius: 10px;
+
   font-size: 14px;
+  font-family: inherit;
+
   cursor: pointer;
+
   text-align: left;
+
   transition: background 0.15s ease;
 }
 
@@ -50,15 +100,36 @@
   background: #2f2f2f;
 }
 
-/* Scrollable session list */
+/* =========================================================
+   Session List
+   ========================================================= */
+
 .session-list {
-  flex: 1;
+  display: block;
+
+  flex: 1 1 auto;
+
+  min-width: 0;
+  min-height: 0;
+
+  width: 100%;
+
+  box-sizing: border-box;
+
   overflow-y: auto;
+  overflow-x: hidden;
+
   padding: 4px 14px;
 }
 
+/* Scrollbar */
+
 .session-list::-webkit-scrollbar {
   width: 6px;
+}
+
+.session-list::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .session-list::-webkit-scrollbar-thumb {
@@ -66,130 +137,325 @@
   border-radius: 3px;
 }
 
+.session-list::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* =========================================================
+   Empty / Loading Message
+   ========================================================= */
+
 .session-empty {
+  display: block;
+
+  width: 100%;
+
+  box-sizing: border-box;
+
   padding: 12px;
+
   color: #9a9a9a;
+
   font-size: 13px;
+
   text-align: center;
 }
 
-/* Session item (rounded, hover + active highlight) */
+/* =========================================================
+   Session Item
+   ========================================================= */
+
 .session-item {
   display: flex;
   align-items: center;
+
   width: 100%;
-  padding: 8px 10px;
-  border-radius: 8px;
-  cursor: pointer;
-  margin-bottom: 2px;
+
+  min-width: 0;
+
   box-sizing: border-box;
+
+  padding: 8px 10px;
+
+  margin-bottom: 2px;
+
+  border-radius: 8px;
+
+  cursor: pointer;
+
+  background: transparent;
+
+  color: #ececec;
+
+  transition: background 0.15s ease;
 }
+
+/* Hover */
 
 .session-item:hover {
   background: #2f2f2f;
 }
 
+/* Active session */
+
 .session-item.active {
   background: #2f2f2f;
 }
 
-.session-name {
-  flex: 1;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  padding-right: 8px;
-  font-size: 14px;
-}
+/* =========================================================
+   Session Content
+   ========================================================= */
 
-/* Three-dot menu button: visible only on hover */
-.session-menu-btn {
-  display: none;
-  border: none;
-  background: transparent;
-  color: #9a9a9a;
-  font-size: 18px;
-  line-height: 18px;
-  padding: 4px 6px;
-  border-radius: 5px;
+.session-content {
+  display: block;
+
+  flex: 1 1 auto;
+
+  min-width: 0;
+  width: 0;
+
+  overflow: hidden;
+
   cursor: pointer;
 }
+
+/* =========================================================
+   Session Name
+   ========================================================= */
+
+.session-name {
+  display: block;
+
+  width: 100%;
+
+  min-width: 0;
+
+  box-sizing: border-box;
+
+  overflow: hidden;
+
+  white-space: nowrap;
+
+  text-overflow: ellipsis;
+
+  padding-right: 8px;
+
+  color: #ececec;
+
+  font-size: 14px;
+
+  line-height: 20px;
+}
+
+/* =========================================================
+   Three Dot Menu Button
+   ========================================================= */
+
+.session-menu-btn {
+  display: none;
+
+  flex: 0 0 auto;
+
+  width: 30px;
+  height: 28px;
+
+  margin-left: 4px;
+
+  padding: 4px 6px;
+
+  box-sizing: border-box;
+
+  border: none;
+
+  border-radius: 5px;
+
+  background: transparent;
+
+  color: #9a9a9a;
+
+  font-size: 18px;
+  line-height: 18px;
+
+  cursor: pointer;
+}
+
+/* Show menu button when hovering session */
 
 .session-item:hover .session-menu-btn {
   display: block;
 }
+
+/* Keep visible for active session */
+
+.session-item.active .session-menu-btn {
+  display: block;
+}
+
+/* Menu button hover */
 
 .session-menu-btn:hover {
   background: #3a3a3a;
   color: #fff;
 }
 
-/* Inline rename input */
+/* =========================================================
+   Rename Input
+   ========================================================= */
+
 .sidebar-rename-input {
-  flex: 1;
+  display: block;
+
+  flex: 1 1 auto;
+
   min-width: 0;
+
+  width: 100%;
+
+  box-sizing: border-box;
+
   background: #2f2f2f;
+
   border: 1px solid #10a37f;
+
   border-radius: 5px;
+
   color: #fff;
-  padding: 4px 6px;
+
+  padding: 5px 7px;
+
   font-size: 14px;
+
+  line-height: 20px;
+
   outline: none;
+
   font-family: inherit;
 }
 
-/* Context menu (fixed at click position) */
+.sidebar-rename-input:focus {
+  border-color: #10a37f;
+}
+
+/* =========================================================
+   Chat Loading / Error Status
+   ========================================================= */
+
+.session-status {
+  flex-shrink: 0;
+
+  padding: 8px 14px;
+
+  font-size: 12px;
+
+  color: #9a9a9a;
+
+  background: #171717;
+}
+
+.session-status.error {
+  color: #ef4146;
+}
+
+/* =========================================================
+   Context Menu
+   ========================================================= */
+
 .sidebar-context-menu {
   position: fixed;
+
   min-width: 150px;
-  background: #212121;
-  color: #fff;
-  border: 1px solid #3d3d3d;
-  border-radius: 8px;
+
+  box-sizing: border-box;
+
   padding: 4px;
+
+  background: #212121;
+
+  color: #fff;
+
+  border: 1px solid #3d3d3d;
+
+  border-radius: 8px;
+
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+
   z-index: 1000;
 }
+
+/* Context menu buttons */
 
 .sidebar-context-menu button {
   display: flex;
   align-items: center;
+
   gap: 8px;
+
   width: 100%;
-  border: none;
-  background: transparent;
-  color: #fff;
-  text-align: left;
+
+  box-sizing: border-box;
+
   padding: 9px 12px;
+
+  border: none;
+
   border-radius: 6px;
+
+  background: transparent;
+
+  color: #fff;
+
+  text-align: left;
+
   font-size: 14px;
-  cursor: pointer;
+
   font-family: inherit;
+
+  cursor: pointer;
 }
 
 .sidebar-context-menu button:hover {
   background: #2f2f2f;
 }
 
+/* Delete option */
+
 .sidebar-context-menu .delete-option {
   color: #ef4146;
 }
 
-/* Responsive: collapsed/stacked on small screens */
+.sidebar-context-menu .delete-option:hover {
+  background: rgba(239, 65, 70, 0.12);
+}
+
+/* =========================================================
+   Responsive - Mobile
+   ========================================================= */
+
 @media (max-width: 768px) {
+
   :host {
     width: 100%;
+    min-width: 100%;
+    max-width: 100%;
+    height: auto;
+    flex: none;
   }
 
   .sidebar {
     width: 100%;
     height: auto;
+
     max-height: 40vh;
+
     border-right: none;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   }
 
   .session-list {
     max-height: 30vh;
+
+    min-height: 0;
+
+    overflow-y: auto;
   }
 }

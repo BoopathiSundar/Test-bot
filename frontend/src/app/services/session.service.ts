@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { ChangeDetectorRef } from '@angular/core';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 
@@ -42,6 +43,14 @@ export interface ActionResult {
   success: boolean;
 }
 
+/** A single stored message pair returned by GET /session/<id>. */
+export interface SessionChat {
+  /** Original user_message (may be a JSON-stringified message from the backend). */
+  user: string;
+  /** Original bot_reply text. */
+  bot: string;
+}
+
 /**
  * HTTP service for session operations against the unchanged Flask API.
  * Uses the same endpoints /sessions, /rename_session/<id>, /delete_session/<id>.
@@ -65,5 +74,22 @@ export class SessionService {
   /** Delete a session via DELETE /delete_session/<id>. */
   deleteSession(id: string): Observable<ActionResult> {
     return this.http.delete<ActionResult>(`/delete_session/${id}`);
+  }
+
+  /**
+   * Load a stored session's saved messages from GET /session/<id>.
+   * The backend returns an array of [user_message, bot_reply] pairs.
+   */
+  loadSession(id: string): Observable<SessionChat[]> {
+    return this.http
+      .get<[string, string][]>(`/session/${id}`)
+      .pipe(
+        map((rows) =>
+          (rows || []).map(([user, bot]) => ({
+            user: user ? String(user) : '',
+            bot: bot ? String(bot) : '',
+          }))
+        )
+      );
   }
 }
