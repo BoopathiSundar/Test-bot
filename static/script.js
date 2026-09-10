@@ -131,6 +131,12 @@ async function sendMessage() {
     const chatBox = document.getElementById("chatbox");
     const chatTitle = document.getElementById("chatTitle");
 
+    // Each "New chat" gets its own id so this submission is saved as a
+    // brand new session (see the session_id field sent below).
+    if (!currentSessionId) {
+        currentSessionId = crypto.randomUUID();
+    }
+
     sendBtn.disabled = true;
     input.disabled = true;
     input.value = "";
@@ -164,7 +170,8 @@ async function sendMessage() {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-                messages: [{ role: "user", content: message }]
+                messages: [{ role: "user", content: message }],
+                session_id: currentSessionId
             })
         });
 
@@ -568,6 +575,97 @@ function toggleSidebar() {
 function closeSidebar() {
     const sidebar = document.getElementById("sidebar");
     if (sidebar) sidebar.classList.remove("open");
+}
+
+/* ================================================================
+   NEW CHAT LISTENER (ChatGPT-style text-area composer)
+   -----------------------------------------------------------------
+   Additive only - none of the original functions are touched here:
+   - Listens on the existing "＋ New Chat" button (startNewChat()
+     still clears the chat area).
+   - Shows a text-area composer in the middle of the chat area while
+     keeping the exact same theme.
+   - Because sendMessage() now sends `session_id`, the submitted chat
+     is saved as a brand new session and appears in the sidebar.
+   ================================================================ */
+
+(function initNewChatListener() {
+    const container = document.querySelector(".container");
+    const chatBox = document.getElementById("chatbox");
+    const heroInput = document.getElementById("newChatInput");
+
+    // Sync the hero with the chat area: the composer is visible whenever
+    // the chat area is empty and hidden as soon as messages exist.
+    function syncNewChatMode() {
+        if (!container) return;
+        const isEmpty = chatBox && chatBox.childElementCount === 0;
+        if (isEmpty) {
+            container.classList.add("new-chat-mode");
+        } else {
+            container.classList.remove("new-chat-mode");
+        }
+    }
+
+    // The New Chat listener. The button keeps its original
+    // onclick="startNewChat()"; this extra listener just focuses the
+    // composer once the hero becomes visible.
+    const newChatBtn = document.getElementById("newChatBtn");
+    if (newChatBtn) {
+        newChatBtn.addEventListener("click", function () {
+            if (heroInput) {
+                setTimeout(function () { heroInput.focus(); }, 0);
+            }
+        });
+    }
+
+    // Enter submits, Shift+Enter inserts a new line (like ChatGPT).
+    if (heroInput) {
+        heroInput.addEventListener("keydown", function (e) {
+            if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                submitNewChat();
+            }
+        });
+    }
+
+    // Watch the chat area so the hero appears on "New chat" / "Clear
+    // all chats" / session deletion and disappears on submit or when a
+    // saved session is loaded.
+    if (chatBox && "MutationObserver" in window) {
+        new MutationObserver(syncNewChatMode).observe(chatBox, { childList: true });
+    }
+
+    syncNewChatMode();
+})();
+
+/* Submit the text-area composer. Handles the text over to the existing
+   streaming flow (sendMessage), which saves it under a fresh session. */
+function submitNewChat() {
+    const heroInput = document.getElementById("newChatInput");
+    const heroSendBtn = document.getElementById("newChatSendBtn");
+
+    const text = heroInput ? heroInput.value.trim() : "";
+
+    if (!text) {
+        if (heroInput) heroInput.focus();
+        return;
+    }
+
+    if (!currentSessionId) {
+        currentSessionId = crypto.randomUUID();
+    }
+
+    if (heroSendBtn) heroSendBtn.disabled = true;
+    if (heroInput) heroInput.value = "";
+
+    // Reuse the existing message input + sendMessage() flow so the
+    // streaming, error handling and session list refresh stay identical.
+    const input = document.getElementById("message");
+    if (input) input.value = text;
+
+    sendMessage();
+
+    if (heroSendBtn) heroSendBtn.disabled = false;
 }
 
 /* ---------- Init ---------- */

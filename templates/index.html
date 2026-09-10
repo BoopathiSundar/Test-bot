@@ -43,6 +43,23 @@
             <h2 id="chatTitle">New chat</h2>
         </header>
 
+        <!-- New Chat Hero (ChatGPT-style welcome + text-area composer) -->
+        <section id="newChatHero" class="new-chat-hero">
+            <div class="hero-inner">
+                <h2 class="hero-title">AI Chat</h2>
+                <p class="hero-subtitle">What can I help you with?</p>
+                <div class="hero-composer">
+                    <textarea
+                        id="newChatInput"
+                        placeholder="Ask anything... (Enter to send, Shift+Enter for a new line)"
+                        autocomplete="off"
+                    ></textarea>
+                    <button id="newChatSendBtn" type="button" onclick="submitNewChat()">Send</button>
+                </div>
+                <p class="hero-hint">Your new chat will be saved as a session.</p>
+            </div>
+        </section>
+
         <!-- Chat Messages -->
         <div class="chat-scroll">
             <div id="chatbox"></div>

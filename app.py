@@ -36,6 +36,11 @@ def chat_stream():
 
     messages = data["messages"]
 
+    # Optional per-chat session id sent by the frontend "New chat" listener.
+    # Falls back to the server-wide session id for older clients, so the
+    # previous behaviour is fully preserved.
+    active_session_id = data.get("session_id") or session_id
+
     def generate():
         full_reply = ""
 
@@ -79,7 +84,7 @@ def chat_stream():
         except Exception as exc:
             yield f"\n[Error: {exc}]"
 
-        save_chat(session_id, messages, full_reply)
+        save_chat(active_session_id, messages, full_reply)
 
     return Response(generate(), mimetype="text/plain")
 

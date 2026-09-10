@@ -7,18 +7,43 @@
   ></app-sidebar>
 
   <main class="main-placeholder">
-    <section *ngIf="!selectedSessionId" class="placeholder-card">
-      <h1>AI Chat</h1>
-      <p>Select a chat from the sidebar or start a new one.</p>
+    <!-- ChatGPT-style welcome + text-area composer (new chat) -->
+    <section *ngIf="!selectedSessionId" class="new-chat-hero">
+      <div class="hero-inner">
+        <h1 class="hero-title">AI Chat</h1>
+        <p class="hero-subtitle">What can I help you with?</p>
+
+        <div class="composer-shell hero">
+          <textarea
+            id="chatInput"
+            [(ngModel)]="input"
+            placeholder="Ask anything... (Enter to send, Shift+Enter for a new line)"
+            autocomplete="off"
+            [disabled]="busy"
+            (keydown.enter)="onEnterKey($event)"
+          ></textarea>
+          <button
+            type="button"
+            class="composer-send"
+            (click)="send()"
+            [disabled]="busy || !input.trim()"
+          >
+            Send
+          </button>
+        </div>
+
+        <p class="hero-hint">Your new chat will be saved as a session.</p>
+      </div>
     </section>
 
+    <!-- Active chat / loaded session -->
     <section *ngIf="selectedSessionId" class="chat-reader">
       <header class="reader-header">
         <h2>Chat</h2>
         <code title="Session ID">{{ selectedSessionId }}</code>
       </header>
 
-      <div *ngIf="sessionMessages.length === 0" class="reader-empty">
+      <div *ngIf="sessionMessages.length === 0 && !livePair" class="reader-empty">
         No messages yet.
       </div>
 
@@ -33,7 +58,41 @@
             <p class="md-body">{{ message.bot }}</p>
           </div>
         </div>
+
+        <!-- Live streaming message -->
+        <div class="reader-pair" *ngIf="livePair">
+          <div class="reader-row user">
+            <strong>You</strong>
+            <p>{{ livePair.user }}</p>
+          </div>
+          <div class="reader-row bot" [class.streaming]="livePair.streaming">
+            <strong>AI</strong>
+            <p class="md-body">{{ livePair.bot }}</p>
+          </div>
+        </div>
       </div>
     </section>
+
+    <!-- ChatGPT-style bottom composer for an active chat -->
+    <div class="chat-composer" *ngIf="selectedSessionId">
+      <div class="composer-shell">
+        <textarea
+          id="bottomChatInput"
+          [(ngModel)]="input"
+          placeholder="Ask anything..."
+          autocomplete="off"
+          [disabled]="busy"
+          (keydown.enter)="onEnterKey($event)"
+        ></textarea>
+        <button
+          type="button"
+          class="composer-send"
+          (click)="send()"
+          [disabled]="busy || !input.trim()"
+        >
+          Send
+        </button>
+      </div>
+    </div>
   </main>
 </div>

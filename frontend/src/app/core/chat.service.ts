@@ -14,12 +14,22 @@ export interface StreamMessage {
 export class ChatService {
   async streamChat(
     messages: StreamMessage[],
-    onToken: (token: string, fullText: string) => void
+    onToken: (token: string, fullText: string) => void,
+    sessionId?: string
   ): Promise<string> {
+    const payload: { messages: StreamMessage[]; session_id?: string } = {
+      messages,
+    };
+    // Optional per-chat session id so a "new chat" is saved as its own
+    // session. When omitted the backend keeps the legacy global behavior.
+    if (sessionId) {
+      payload.session_id = sessionId;
+    }
+
     const response = await fetch('/chat-stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages }),
+      body: JSON.stringify(payload),
     });
 
     if (!response.ok || !response.body) {

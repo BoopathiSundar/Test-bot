@@ -9,6 +9,11 @@
     "secure": false,
     "changeOrigin": true
   },
+  "/chat-stream": {
+    "target": "http://localhost:5000",
+    "secure": false,
+    "changeOrigin": true
+  },
   "/chat": {
     "target": "http://localhost:5000",
     "secure": false,
