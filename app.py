@@ -4,8 +4,15 @@ import json, os
 from database import save_chat, get_connection, list_sessions, clear_chat1, delete_session, list_archived_sessions, set_session_pinned, set_session_archived
 import uuid
 from ollama_config import OLLAMA_URL, OLLAMA_MODEL, OLLAMA_TIMEOUT, OLLAMA_STREAM
+import os
+from flask import Flask, request, jsonify
+from werkzeug.utils import secure_filename
 
 session_id = str(uuid.uuid4())
+
+UPLOAD_FOLDER = "uploads"
+
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # Base directory of this file, used to locate the built Angular frontend.
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -18,6 +25,8 @@ app = Flask(
     static_folder=FRONTEND_DIST if os.path.isdir(FRONTEND_DIST) else "static",
 )
 
+app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
+
 @app.route("/")
 def home():
     # Serve the compiled Angular single-page app when available.
@@ -28,6 +37,10 @@ def home():
         return app.send_static_file("index.html")
     # Fallback to the original template when the frontend is not built.
     return render_template("index.html")
+
+@app.route("/health-check")
+def health():
+    return "Healthy"
 
 @app.route("/chat-stream", methods=["POST"])
 def chat_stream():
@@ -244,6 +257,116 @@ def unarchive_chat(session_id):
 @app.route("/archived-chats", methods=["GET"])
 def get_archived_chats():
     return jsonify(list_archived_sessions())
+
+@app.route("/upload-document", methods=["POST"])
+def upload_document():
+
+    if "file" not in request.files:
+        return jsonify({
+            "success": False,
+            "message": "No file uploaded"
+        }), 400
+
+    file = request.files["file"]
+
+    if file.filename == "":
+        return jsonify({
+            "success": False,
+            "message": "No file selected"
+        }), 400
+
+    filename = secure_filename(file.filename)
+
+    file_path = os.path.join(
+        app.config["UPLOAD_FOLDER"],
+        filename
+    )
+
+    file.save(file_path)
+
+    return jsonify({
+        "success": True,
+        "message": "Document uploaded successfully",
+        "filename": filename,
+        "path": file_path
+    })
+
+@app.route("/ask-document", methods=["POST"])
+def ask_document():
+
+    data = request.get_json()
+
+    if not data or "question" not in data:
+        return jsonify({
+            "success": False,
+            "message": "Question is required"
+        }), 400
+
+    question = data["question"]
+
+    # Document location
+    file_path = os.path.join(
+        app.config["UPLOAD_FOLDER"],
+        "tobacco.txt"
+    )
+
+    # Check whether document exists
+    if not os.path.exists(file_path):
+        return jsonify({
+            "success": False,
+            "message": "tobacco.txt has not been uploaded"
+        }), 404
+
+    # Read document
+    with open(file_path, "r", encoding="utf-8") as file:
+        document_text = file.read()
+
+    # Prompt for Qwen
+    prompt = f"""
+You are a document question-answering assistant.
+
+Answer the user's question using ONLY the information
+provided in the document below.
+
+If the answer is not available in the document,
+say: "The answer is not available in the uploaded document."
+
+DOCUMENT:
+--------------------
+{document_text}
+--------------------
+
+USER QUESTION:
+{question}
+
+Give a clear and concise answer.
+"""
+
+    # Call Ollama
+    ollama_response = requests.post(
+        "http://localhost:11434/api/generate",
+        json={
+            "model": "qwen3:latest",
+            "prompt": prompt,
+            "stream": False
+        },
+        timeout=120
+    )
+
+    if ollama_response.status_code != 200:
+        return jsonify({
+            "success": False,
+            "message": "Ollama request failed",
+            "details": ollama_response.text
+        }), 500
+
+    result = ollama_response.json()
+
+    return jsonify({
+        "success": True,
+        "question": question,
+        "answer": result.get("response", "")
+    })
 
 if __name__ == "__main__":
     app.run(debug=True)
