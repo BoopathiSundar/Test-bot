@@ -7,6 +7,7 @@ from ollama_config import OLLAMA_URL, OLLAMA_MODEL, OLLAMA_TIMEOUT, OLLAMA_STREA
 import os
 from flask import Flask, request, jsonify
 from werkzeug.utils import secure_filename
+from mcp_client import search_document
 
 session_id = str(uuid.uuid4())
 
@@ -367,6 +368,36 @@ Give a clear and concise answer.
         "question": question,
         "answer": result.get("response", "")
     })
+
+@app.route("/mcp-search", methods=["POST"])
+def mcp_search():
+
+    data = request.get_json()
+
+    if not data or "query" not in data:
+        return jsonify({
+            "success": False,
+            "message": "Query is required"
+        }), 400
+
+    query = data["query"]
+
+    try:
+
+        result = search_document(query)
+
+        return jsonify({
+            "success": True,
+            "query": query,
+            "result": result
+        })
+
+    except Exception as exc:
+
+        return jsonify({
+            "success": False,
+            "message": str(exc)
+        }), 500
 
 if __name__ == "__main__":
     app.run(debug=True)
