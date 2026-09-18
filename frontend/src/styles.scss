@@ -568,4 +568,26 @@ body {
     .message-content {
         max-width: 88%;
     }
+
+    .rag-test-area {
+    display: flex;
+    justify-content: center;
+    padding: 10px 20px;
+    position: relative;
+    z-index: 10;
+    }
+
+    .rag-test-btn {
+    display: inline-block;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    }
+
+    .rag-test-btn:hover {
+    opacity: 0.85;
+    }
 }

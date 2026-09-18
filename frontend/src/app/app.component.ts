@@ -121,4 +121,80 @@ export class AppComponent {
     this.livePair = null;
     this.input = '';
   }
+
+  askDocument(question: string): void {
+      console.log('Calling RAG:', question);
+
+      if (!question.trim() || this.busy) return;
+
+      const text = question.trim();
+
+      // Create a session for the RAG conversation
+      if (!this.selectedSessionId) {
+        this.selectedSessionId = crypto.randomUUID();
+      }
+
+      this.busy = true;
+      this.input = '';
+
+      // Show searching status immediately
+      const pair: LivePair = {
+        user: text,
+        bot: '🔍 Searching document...',
+        streaming: true
+      };
+
+      this.livePair = pair;
+
+      this.chatService.askRag(text).subscribe({
+        next: (response) => {
+          console.log('RAG HTTP response:', response);
+
+          if (response.success) {
+            pair.bot =
+              '📄 Document search completed ✓\n\n' +
+              response.answer;
+          } else {
+            pair.bot = '⚠️ RAG service returned an unsuccessful response.';
+          }
+
+          pair.streaming = false;
+
+          // Save into existing session message structure
+          this.sessionMessages = [
+            ...this.sessionMessages,
+            {
+              user: text,
+              bot: pair.bot
+            }
+          ];
+
+          this.livePair = null;
+          this.busy = false;
+
+          this.sidebar?.refreshSessions();
+        },
+
+        error: (error) => {
+          console.error('RAG error:', error);
+
+          pair.bot =
+            '❌ Document search failed.\n\n' +
+            'Please check the RAG service.';
+
+          pair.streaming = false;
+
+          this.sessionMessages = [
+            ...this.sessionMessages,
+            {
+              user: text,
+              bot: pair.bot
+            }
+          ];
+
+          this.livePair = null;
+          this.busy = false;
+        }
+      });
+}
 }

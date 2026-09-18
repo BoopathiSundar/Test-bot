@@ -9,6 +9,17 @@
   <main class="main-placeholder">
     <!-- ChatGPT-style welcome + text-area composer (new chat) -->
     <section *ngIf="!selectedSessionId" class="new-chat-hero">
+
+      <div class="rag-test-area">
+        <button
+          type="button"
+          class="rag-test-btn"
+          (click)="askDocument('What is MPOWER?')"
+          [disabled]="busy"
+        >
+          🔍 Test RAG
+        </button>
+      </div>
       <div class="hero-inner">
         <h1 class="hero-title">AI Chat</h1>
         <p class="hero-subtitle">What can I help you with?</p>

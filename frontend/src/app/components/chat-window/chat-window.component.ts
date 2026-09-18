@@ -81,4 +81,23 @@ export class ChatWindowComponent {
       if (el) el.scrollTop = el.scrollHeight;
     });
   }
+
+  askDocument(question: string) {
+
+    this.chatService.askRag(question).subscribe({
+      next: (response) => {
+
+        console.log('RAG response:', response);
+
+        console.log('Answer:', response.answer);
+
+      },
+
+      error: (error) => {
+
+        console.error('RAG error:', error);
+
+      }
+    });
+  }
 }

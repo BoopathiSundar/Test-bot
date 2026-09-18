@@ -1,3 +1,23 @@
-/* Styles for the chat window are handled by the global styles.scss.
+.rag-test-area {
+  display: flex;
+  justify-content: center;
+  padding: 10px 20px;
+  position: relative;
+  z-index: 10;
+}
+
+.rag-test-btn {
+  display: inline-block;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.rag-test-btn:hover {
+  opacity: 0.85;
+}/* Styles for the chat window are handled by the global styles.scss.
    This file intentionally mirrors nothing - the classes .chat-scroll,
    #chatbox, .message-row, .input-area etc. are global. */

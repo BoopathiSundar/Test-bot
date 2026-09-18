@@ -1,4 +1,5 @@
 import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
 
 export interface StreamMessage {
   role: string;
@@ -50,4 +51,14 @@ export class ChatService {
 
     return fullText;
   }
+
+  constructor(private http: HttpClient) {}
+  askRag(question: string) {
+  return this.http.post<any>(
+    'http://localhost:5000/ask-rag',
+    {
+      question: question
+    }
+  );
+}
 }

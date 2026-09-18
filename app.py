@@ -1,17 +1,69 @@
 from flask import Flask, render_template, request, jsonify, Response
 import requests
-import json, os
-from database import save_chat, get_connection, list_sessions, clear_chat1, delete_session, list_archived_sessions, set_session_pinned, set_session_archived
-import uuid
-from ollama_config import OLLAMA_URL, OLLAMA_MODEL, OLLAMA_TIMEOUT, OLLAMA_STREAM
+import json
 import os
-from flask import Flask, request, jsonify
+import uuid
+
 from werkzeug.utils import secure_filename
+from flask_cors import CORS
+
+from database import (
+    save_chat,
+    get_connection,
+    list_sessions,
+    clear_chat1,
+    delete_session,
+    list_archived_sessions,
+    set_session_pinned,
+    set_session_archived
+)
+
+from ollama_config import (
+    OLLAMA_URL,
+    OLLAMA_MODEL,
+    OLLAMA_TIMEOUT,
+    OLLAMA_STREAM
+)
+
 from mcp_client import search_document
+from rag_service import ask_rag
+
+
+# Base directory
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+FRONTEND_DIST = os.path.join(
+    BASE_DIR,
+    "frontend",
+    "dist",
+    "frontend",
+    "browser"
+)
+
+print("Frontend:", FRONTEND_DIST)
+
+
+# Create Flask app ONLY ONCE
+app = Flask(
+    __name__,
+    static_folder=(
+        FRONTEND_DIST
+        if os.path.isdir(FRONTEND_DIST)
+        else "static"
+    )
+)
+
+
+# Enable CORS on the actual Flask app
+CORS(app)
 
 session_id = str(uuid.uuid4())
 
 UPLOAD_FOLDER = "uploads"
+
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
@@ -27,6 +79,13 @@ app = Flask(
 )
 
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
+
+@app.after_request
+def add_cors_headers(response):
+    response.headers["Access-Control-Allow-Origin"] = "http://localhost:4200"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+    return response
 
 @app.route("/")
 def home():
@@ -398,6 +457,58 @@ def mcp_search():
             "success": False,
             "message": str(exc)
         }), 500
+
+@app.route("/ask-rag", methods=["POST"])
+def ask_rag_api():
+
+    data = request.get_json()
+
+    if not data or "question" not in data:
+        return jsonify({
+            "success": False,
+            "message": "Question is required"
+        }), 400
+
+    question = data["question"].strip()
+
+    if not question:
+        return jsonify({
+            "success": False,
+            "message": "Question cannot be empty"
+        }), 400
+
+    try:
+
+        answer = ask_rag(question)
+
+        return jsonify({
+            "success": True,
+            "question": question,
+            "answer": answer
+        })
+
+    except Exception as exc:
+
+        return jsonify({
+            "success": False,
+            "message": "RAG request failed",
+            "details": str(exc)
+        }), 500
+
+@app.route("/cors-test", methods=["GET"])
+def cors_test():
+    return jsonify({
+        "success": True,
+        "message": "CORS is working"
+    })
+
+
+@app.route("/server-info", methods=["GET"])
+def server_info():
+    return jsonify({
+        "server": "AI-Bot Flask",
+        "message": "This is the correct Flask server"
+    })
 
 if __name__ == "__main__":
     app.run(debug=True)
