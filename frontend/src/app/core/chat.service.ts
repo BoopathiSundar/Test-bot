@@ -53,11 +53,12 @@ export class ChatService {
   }
 
   constructor(private http: HttpClient) {}
-  askRag(question: string) {
+  askRag(question: string, sessionId: string) {
   return this.http.post<any>(
     'http://localhost:5000/ask-rag',
     {
-      question: question
+      question: question,
+      session_id: sessionId
     }
   );
 }

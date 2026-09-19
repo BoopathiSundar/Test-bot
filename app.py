@@ -477,32 +477,45 @@ def ask_rag_api():
             "message": "Question cannot be empty"
         }), 400
 
-    try:
+    session_id = data.get("session_id")
 
+    if not session_id:
+        return jsonify({
+            "success": False,
+            "message": "session_id is required"
+        }), 400
+
+    try:
+        # Search the document using RAG
         answer = ask_rag(question)
+
+        # Save RAG conversation to SQLite
+        save_chat(
+            session_id,
+            question,
+            answer
+        )
+
+        print(f"RAG chat saved - session: {session_id}")
 
         return jsonify({
             "success": True,
             "question": question,
-            "answer": answer
+            "answer": answer,
+            "session_id": session_id,
+            "saved": True
         })
 
     except Exception as exc:
+
+        print("RAG error:", exc)
 
         return jsonify({
             "success": False,
             "message": "RAG request failed",
             "details": str(exc)
         }), 500
-
-@app.route("/cors-test", methods=["GET"])
-def cors_test():
-    return jsonify({
-        "success": True,
-        "message": "CORS is working"
-    })
-
-
+    
 @app.route("/server-info", methods=["GET"])
 def server_info():
     return jsonify({

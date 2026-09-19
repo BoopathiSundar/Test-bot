@@ -123,78 +123,75 @@ export class AppComponent {
   }
 
   askDocument(question: string): void {
-      console.log('Calling RAG:', question);
+  console.log('Calling RAG:', question);
 
-      if (!question.trim() || this.busy) return;
+  if (!question.trim() || this.busy) return;
 
-      const text = question.trim();
+  const text = question.trim();
 
-      // Create a session for the RAG conversation
-      if (!this.selectedSessionId) {
-        this.selectedSessionId = crypto.randomUUID();
-      }
+  if (!this.selectedSessionId) {
+    this.selectedSessionId = crypto.randomUUID();
+  }
 
-      this.busy = true;
-      this.input = '';
+  const sessionId = this.selectedSessionId;
 
-      // Show searching status immediately
-      const pair: LivePair = {
-        user: text,
-        bot: '🔍 Searching document...',
-        streaming: true
-      };
+  this.busy = true;
+  this.input = '';
 
-      this.livePair = pair;
+  const pair: LivePair = {
+    user: text,
+    bot: '🔍 Searching document...',
+    streaming: true
+  };
 
-      this.chatService.askRag(text).subscribe({
-        next: (response) => {
-          console.log('RAG HTTP response:', response);
+  this.livePair = pair;
 
-          if (response.success) {
-            pair.bot =
-              '📄 Document search completed ✓\n\n' +
-              response.answer;
-          } else {
-            pair.bot = '⚠️ RAG service returned an unsuccessful response.';
-          }
+  this.chatService.askRag(text, sessionId).subscribe({
+    next: (response) => {
 
-          pair.streaming = false;
+      console.log('RAG HTTP 200:', response);
 
-          // Save into existing session message structure
-          this.sessionMessages = [
-            ...this.sessionMessages,
-            {
-              user: text,
-              bot: pair.bot
-            }
-          ];
+      pair.bot =
+        '📄 Document search completed ✓\n\n' +
+        response.answer;
 
-          this.livePair = null;
-          this.busy = false;
+      pair.streaming = false;
 
-          this.sidebar?.refreshSessions();
-        },
-
-        error: (error) => {
-          console.error('RAG error:', error);
-
-          pair.bot =
-            '❌ Document search failed.\n\n' +
-            'Please check the RAG service.';
-
-          pair.streaming = false;
-
-          this.sessionMessages = [
-            ...this.sessionMessages,
-            {
-              user: text,
-              bot: pair.bot
-            }
-          ];
-
-          this.livePair = null;
-          this.busy = false;
+      this.sessionMessages = [
+        ...this.sessionMessages,
+        {
+          user: text,
+          bot: pair.bot
         }
-      });
+      ];
+
+      this.livePair = null;
+      this.busy = false;
+
+      this.sidebar?.refreshSessions();
+    },
+
+    error: (error) => {
+
+      console.error('RAG error:', error);
+
+      pair.bot =
+        '❌ Document search failed.\n\n' +
+        'Please check the RAG service.';
+
+      pair.streaming = false;
+
+      this.sessionMessages = [
+        ...this.sessionMessages,
+        {
+          user: text,
+          bot: pair.bot
+        }
+      ];
+
+      this.livePair = null;
+      this.busy = false;
+    }
+  });
 }
 }

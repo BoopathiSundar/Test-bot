@@ -12,6 +12,7 @@ MCP_SERVER = (
     BASE_DIR
     / "mcp_servers"
     / "document_server.py"
+    / "git_server.py"
 )
 
 
@@ -91,6 +92,113 @@ def read_document(filename):
             "read_document",
             {
                 "filename": filename
+            }
+        )
+    )
+
+async def call_git_mcp_tool(tool_name, arguments):
+    """
+    Start the Git MCP server and execute a Git tool.
+    """
+
+    server_params = StdioServerParameters(
+        command=sys.executable,
+        args=[str(MCP_SERVER)],
+        env=None
+    )
+
+    async with stdio_client(server_params) as (read, write):
+
+        async with ClientSession(read, write) as session:
+
+            await session.initialize()
+
+            result = await session.call_tool(
+                tool_name,
+                arguments
+            )
+
+            output = []
+
+            if result.content:
+
+                for item in result.content:
+
+                    if hasattr(item, "text"):
+                        output.append(item.text)
+
+                    else:
+                        output.append(str(item))
+
+            return "\n".join(output)
+
+        def git_status():
+         return asyncio.run(
+         call_git_mcp_tool(
+            "git_status",
+            {}
+        )
+    )
+
+
+def git_log(limit=10):
+    return asyncio.run(
+        call_git_mcp_tool(
+            "git_log",
+            {
+                "limit": limit
+            }
+        )
+    )
+
+
+def git_diff():
+    return asyncio.run(
+        call_git_mcp_tool(
+            "git_diff",
+            {}
+        )
+    )
+
+
+def git_branches():
+    return asyncio.run(
+        call_git_mcp_tool(
+            "git_branches",
+            {}
+        )
+    )
+
+
+def git_search(keyword):
+    return asyncio.run(
+        call_git_mcp_tool(
+            "git_search",
+            {
+                "keyword": keyword
+            }
+        )
+    )
+
+
+def git_file_history(filename, limit=10):
+    return asyncio.run(
+        call_git_mcp_tool(
+            "git_file_history",
+            {
+                "filename": filename,
+                "limit": limit
+            }
+        )
+    )
+
+
+def git_show_commit(commit):
+    return asyncio.run(
+        call_git_mcp_tool(
+            "git_show_commit",
+            {
+                "commit": commit
             }
         )
     )
