@@ -1,140 +1,275 @@
 import subprocess
-from pathlib import Path
+import sys
 
 from mcp.server.fastmcp import FastMCP
 
 
 mcp = FastMCP("Git Analysis Server")
 
-
-# Change this to your actual Git repository
-GIT_REPO = Path(r"D:\Boopathi\AI-Bot")
-
-
-def run_git(*args):
-    """
-    Execute a Git command inside the repository.
-    """
-
+@mcp.tool()
+def git_status() -> str:
     result = subprocess.run(
-        ["git", *args],
-        cwd=GIT_REPO,
-        capture_output=True,
+        [
+            "cmd.exe",
+            "/c",
+            "git",
+            "status",
+            "--short",
+            "--branch"
+        ],
+        cwd=r"D:\Boopathi\AI-Bot",
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
         text=True,
         encoding="utf-8",
-        errors="replace"
+        errors="replace",
+        timeout=30
     )
 
     if result.returncode != 0:
-        raise RuntimeError(result.stderr.strip())
+        return (
+            f"Git command failed.\n"
+            f"returncode: {result.returncode}\n"
+            f"stderr: {result.stderr}"
+        )
+
+    return result.stdout.strip()
+
+@mcp.tool()
+def git_branches() -> str:
+    result = subprocess.run(
+        [
+            "cmd.exe",
+            "/c",
+            "git",
+            "branch",
+            "-a"
+        ],
+        cwd=r"D:\Boopathi\AI-Bot",
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=30
+    )
+
+    if result.returncode != 0:
+        return (
+            f"Git command failed.\n"
+            f"returncode: {result.returncode}\n"
+            f"stderr: {result.stderr}"
+        )
+
+    return result.stdout.strip()
+
+@mcp.tool()
+def git_branches() -> str:
+    result = subprocess.run(
+        [
+            "cmd.exe",
+            "/c",
+            "git",
+            "branch",
+            "-a"
+        ],
+        cwd=r"D:\Boopathi\AI-Bot",
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=30
+    )
+
+    if result.returncode != 0:
+        return (
+            f"Git command failed.\n"
+            f"returncode: {result.returncode}\n"
+            f"stderr: {result.stderr}"
+        )
 
     return result.stdout.strip()
 
 
 @mcp.tool()
-def git_status():
-    """
-    Show the current Git branch and working-tree status.
-    """
+def git_search(keyword: str) -> str:
+    if not keyword.strip():
+        return "Keyword cannot be empty."
 
-    branch = run_git(
-        "branch",
-        "--show-current"
+    result = subprocess.run(
+        [
+            "cmd.exe",
+            "/c",
+            "git",
+            "log",
+            "--all",
+            "--oneline",
+            "--decorate",
+            "--grep",
+            keyword,
+            "-i"
+        ],
+        cwd=r"D:\Boopathi\AI-Bot",
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=30
     )
 
-    status = run_git(
-        "status",
-        "--short"
-    )
+    if result.returncode != 0:
+        return (
+            f"Git command failed.\n"
+            f"returncode: {result.returncode}\n"
+            f"stderr: {result.stderr}"
+        )
 
-    return (
-        f"Current branch: {branch or '(detached HEAD)'}\n\n"
-        f"Working tree:\n{status or 'Clean'}"
-    )
+    return result.stdout.strip() or "No matching commits found."
 
 
 @mcp.tool()
-def git_log(limit: int = 10):
-    """
-    Show recent Git commits.
-    """
+def git_file_history(
+    filename: str,
+    limit: int = 10
+) -> str:
 
-    return run_git(
-        "log",
-        f"-{limit}",
-        "--date=short",
-        "--pretty=format:%h | %ad | %an | %s"
+    if not filename.strip():
+        return "Filename cannot be empty."
+
+    limit = max(1, min(limit, 100))
+
+    result = subprocess.run(
+        [
+            "cmd.exe",
+            "/c",
+            "git",
+            "log",
+            f"-{limit}",
+            "--follow",
+            "--date=short",
+            "--pretty=format:%h | %ad | %an | %s",
+            "--",
+            filename
+        ],
+        cwd=r"D:\Boopathi\AI-Bot",
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=30
     )
+
+    if result.returncode != 0:
+        return (
+            f"Git command failed.\n"
+            f"returncode: {result.returncode}\n"
+            f"stderr: {result.stderr}"
+        )
+
+    return result.stdout.strip() or "No history found."
 
 
 @mcp.tool()
-def git_diff():
-    """
-    Show current uncommitted changes.
-    """
+def git_show_commit(commit: str) -> str:
 
-    return run_git("diff")
+    if not commit.strip():
+        return "Commit cannot be empty."
 
-
-@mcp.tool()
-def git_branches():
-    """
-    Show local and remote Git branches.
-    """
-
-    return run_git(
-        "branch",
-        "-a"
+    result = subprocess.run(
+        [
+            "cmd.exe",
+            "/c",
+            "git",
+            "show",
+            "--stat",
+            "--oneline",
+            commit
+        ],
+        cwd=r"D:\Boopathi\AI-Bot",
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=30
     )
 
+    if result.returncode != 0:
+        return (
+            f"Git command failed.\n"
+            f"returncode: {result.returncode}\n"
+            f"stderr: {result.stderr}"
+        )
+
+    return result.stdout.strip()
 
 @mcp.tool()
-def git_search(keyword: str):
-    """
-    Search Git commit history for a keyword.
-    """
-
-    return run_git(
-        "log",
-        "--all",
-        "--oneline",
-        "--decorate",
-        "--grep",
-        keyword,
-        "-i"
+def git_diff() -> str:
+    result = subprocess.run(
+        [
+            "cmd.exe",
+            "/c",
+            "git",
+            "diff"
+        ],
+        cwd=r"D:\Boopathi\AI-Bot",
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=30
     )
 
+    if result.returncode != 0:
+        return (
+            f"Git command failed.\n"
+            f"returncode: {result.returncode}\n"
+            f"stderr: {result.stderr}"
+        )
+
+    return result.stdout.strip() or "No changes found."
 
 @mcp.tool()
-def git_file_history(filename: str, limit: int = 10):
-    """
-    Show the commit history of a specific file.
-    """
-
-    return run_git(
-        "log",
-        f"-{limit}",
-        "--follow",
-        "--date=short",
-        "--pretty=format:%h | %ad | %an | %s",
-        "--",
-        filename
+def git_log(limit: int = 5) -> str:
+    result = subprocess.run(
+        [
+            "cmd.exe",
+            "/c",
+            "git",
+            "log",
+            f"-{limit}",
+            "--date=short",
+            "--pretty=format:%h | %ad | %an | %s"
+        ],
+        cwd=r"D:\Boopathi\AI-Bot",
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=30
     )
 
+    if result.returncode != 0:
+        return (
+            f"Git command failed.\n"
+            f"returncode: {result.returncode}\n"
+            f"stderr: {result.stderr}"
+        )
 
-@mcp.tool()
-def git_show_commit(commit: str):
-    """
-    Show details of a specific commit.
-    """
-
-    return run_git(
-        "show",
-        "--stat",
-        "--oneline",
-        commit
-    )
-
+    return result.stdout.strip()
 
 if __name__ == "__main__":
     mcp.run()

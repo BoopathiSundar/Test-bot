@@ -15,12 +15,7 @@ MCP_SERVER = (
     / "git_server.py"
 )
 
-
-async def call_mcp_tool(tool_name, arguments):
-    """
-    Start the MCP document server, connect to it,
-    and execute an MCP tool.
-    """
+async def call_git_mcp_tool(tool_name, arguments):
 
     server_params = StdioServerParameters(
         command=sys.executable,
@@ -28,31 +23,59 @@ async def call_mcp_tool(tool_name, arguments):
         env=None
     )
 
-    async with stdio_client(server_params) as (read, write):
+    try:
+        async with stdio_client(server_params) as (read, write):
 
-        async with ClientSession(read, write) as session:
+            async with ClientSession(read, write) as session:
 
-            await session.initialize()
+                print(f"Initializing MCP server: {GIT_MCP_SERVER}")
 
-            result = await session.call_tool(
-                tool_name,
-                arguments
-            )
+                await session.initialize()
 
-            output = []
+                print(f"Calling tool: {tool_name}")
 
-            if result.content:
+                result = await session.call_tool(
+                    tool_name,
+                    arguments
+                )
 
-                for item in result.content:
+                print("Tool call completed")
 
-                    if hasattr(item, "text"):
-                        output.append(item.text)
+                output = []
 
-                    else:
-                        output.append(str(item))
+                if result.content:
+                    for item in result.content:
+                        if hasattr(item, "text"):
+                            output.append(item.text)
+                        else:
+                            output.append(str(item))
 
-            return "\n".join(output)
+                return "\n".join(output)
 
+    except BaseExceptionGroup as exc:
+
+        print("\n===== MCP EXCEPTION GROUP =====")
+
+        def print_exception(error, level=0):
+            indent = "  " * level
+
+            print(f"{indent}{type(error).__name__}: {error}")
+
+            if isinstance(error, BaseExceptionGroup):
+                for child in error.exceptions:
+                    print_exception(child, level + 1)
+
+        print_exception(exc)
+
+        raise
+
+    except Exception as exc:
+
+        print("\n===== MCP ERROR =====")
+        print(f"Type: {type(exc).__name__}")
+        print(f"Message: {exc!r}")
+
+        raise
 
 def search_document(query):
     """
@@ -60,7 +83,7 @@ def search_document(query):
     """
 
     return asyncio.run(
-        call_mcp_tool(
+        call_git_mcp_tool(
             "search_document",
             {
                 "query": query
