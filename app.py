@@ -24,8 +24,16 @@ from ollama_config import (
     OLLAMA_TIMEOUT,
     OLLAMA_STREAM
 )
-
-from mcp_client import search_document
+from mcp_client import (
+    search_document,
+    git_status,
+    git_log,
+    git_diff,
+    git_branches,
+    git_search,
+    git_file_history,
+    git_show_commit
+)
 from rag_service import ask_rag
 
 
@@ -102,6 +110,373 @@ def home():
 def health():
     return "Healthy"
 
+def execute_git_tool(tool_name, arguments):
+    """
+    Execute an allowed Git MCP tool.
+    """
+
+    if tool_name == "git_status":
+        return git_status()
+
+    elif tool_name == "git_log":
+        return git_log(
+            arguments.get("limit", 10)
+        )
+
+    elif tool_name == "git_diff":
+        return git_diff()
+
+    elif tool_name == "git_branches":
+        return git_branches()
+
+    elif tool_name == "git_search":
+        return git_search(
+            arguments.get("keyword", "")
+        )
+
+    elif tool_name == "git_file_history":
+        return git_file_history(
+            arguments.get("filename", ""),
+            arguments.get("limit", 10)
+        )
+
+    elif tool_name == "git_show_commit":
+        return git_show_commit(
+            arguments.get("commit", "")
+        )
+
+    else:
+        raise ValueError(
+            f"Unsupported Git MCP tool: {tool_name}"
+        )
+
+def ask_qwen_for_git_tool(question):
+
+    prompt = f"""
+You are a Git analysis assistant.
+
+User question:
+{question}
+
+Determine whether the question requires information from the Git repository.
+
+If Git information is NOT required, return ONLY:
+
+{{
+    "use_git": false
+}}
+
+If Git information IS required, select the most appropriate tool from the
+following allowed Git tools.
+
+Available tools:
+
+1. git_status
+   Use for questions about the current working tree status,
+   modified files, staged files, or uncommitted changes.
+
+2. git_log
+   Use for questions about commits, recent commits, commit history,
+   or latest commits.
+
+3. git_diff
+   Use for questions about current code changes or differences.
+
+4. git_branches
+   Use for questions about branches, available branches,
+   current branches, or branch names.
+
+5. git_search
+   Use for searching the repository for a keyword or text.
+
+6. git_file_history
+   Use for questions about the history of a specific file.
+
+7. git_show_commit
+   Use when the user asks about a specific commit.
+
+Return ONLY JSON.
+
+Examples:
+
+Question:
+Show me the latest commits
+
+Return:
+{{
+    "use_git": true,
+    "tool": "git_log",
+    "arguments": {{
+        "limit": 10
+    }}
+}}
+
+Question:
+Show me the available branches
+
+Return:
+{{
+    "use_git": true,
+    "tool": "git_branches",
+    "arguments": {{}}
+}}
+
+Question:
+What files have been modified?
+
+Return:
+{{
+    "use_git": true,
+    "tool": "git_status",
+    "arguments": {{}}
+}}
+
+Question:
+Show me the changes
+
+Return:
+{{
+    "use_git": true,
+    "tool": "git_diff",
+    "arguments": {{}}
+}}
+
+Question:
+Show the history of app.py
+
+Return:
+{{
+    "use_git": true,
+    "tool": "git_file_history",
+    "arguments": {{
+        "filename": "app.py",
+        "limit": 10
+    }}
+}}
+
+Question:
+Show commit 9d2f197
+
+Return:
+{{
+    "use_git": true,
+    "tool": "git_show_commit",
+    "arguments": {{
+        "commit": "9d2f197"
+    }}
+}}
+
+Do not use markdown.
+Do not add any explanation.
+Return ONLY the JSON object.
+"""
+
+    print("\n===== QWEN GIT TOOL TEST =====")
+    print("Question:", question)
+    print("Model:", OLLAMA_MODEL)
+    print("URL:", OLLAMA_URL)
+
+    response = requests.post(
+        OLLAMA_URL,
+        json={
+            "model": OLLAMA_MODEL,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            "stream": False
+        },
+        timeout=OLLAMA_TIMEOUT
+    )
+
+    print("HTTP Status:", response.status_code)
+    print("Raw Response:", response.text)
+
+    response.raise_for_status()
+
+    result = response.json()
+
+    answer = result.get("message", {}).get("content", "")
+
+    print("Qwen Answer:", repr(answer))
+
+    return answer.strip()
+
+@app.route("/git-ai-test", methods=["POST"])
+def git_ai_test():
+
+    try:
+        data = request.get_json() or {}
+
+        question = data.get("question", "").strip()
+
+        if not question:
+            return jsonify({
+                "success": False,
+                "error": "Question is required"
+            }), 400
+
+        decision = ask_qwen_for_git_tool(question)
+
+        return jsonify({
+            "success": True,
+            "question": question,
+            "decision": decision
+        })
+
+    except Exception as exc:
+
+        return jsonify({
+            "success": False,
+            "error": str(exc)
+        }), 500
+
+def parse_git_decision(decision_text):
+    """
+    Convert Qwen's Git decision into a Python dictionary.
+    """
+
+    try:
+        decision = json.loads(decision_text)
+
+        if not isinstance(decision, dict):
+            return {
+                "use_git": False
+            }
+
+        return decision
+
+    except json.JSONDecodeError:
+
+        print("Invalid Git decision from Qwen:")
+        print(decision_text)
+
+        return {
+            "use_git": False
+        }
+
+
+import time
+
+def get_git_context(question):
+
+    start = time.time()
+
+    print("\n===== GIT CONTEXT START =====")
+
+    decision_start = time.time()
+
+    decision_text = ask_qwen_for_git_tool(question)
+
+    print(
+        f"Qwen Git decision time: "
+        f"{time.time() - decision_start:.2f} seconds"
+    )
+
+    decision = parse_git_decision(decision_text)
+
+    print("\n===== GIT DECISION =====")
+    print(decision)
+
+    if not decision.get("use_git", False):
+
+        print(
+            f"Total Git context time: "
+            f"{time.time() - start:.2f} seconds"
+        )
+
+        return {
+            "used_git": False,
+            "tool": None,
+            "result": ""
+        }
+
+    tool_name = decision.get("tool")
+    arguments = decision.get("arguments", {})
+
+    if not tool_name:
+        return {
+            "used_git": False,
+            "tool": None,
+            "result": ""
+        }
+
+    print("\n===== EXECUTING GIT MCP =====")
+
+    tool_start = time.time()
+
+    try:
+
+        result = execute_git_tool(
+            tool_name,
+            arguments
+        )
+
+        print(
+            f"Git tool execution time: "
+            f"{time.time() - tool_start:.2f} seconds"
+        )
+
+        print("\n===== GIT MCP RESULT =====")
+        print(result)
+
+        print(
+            f"Total Git context time: "
+            f"{time.time() - start:.2f} seconds"
+        )
+
+        return {
+            "used_git": True,
+            "tool": tool_name,
+            "result": result
+        }
+
+    except Exception as exc:
+
+        print("\n===== GIT MCP ERROR =====")
+        print(str(exc))
+
+        return {
+            "used_git": False,
+            "tool": tool_name,
+            "result": "",
+            "error": str(exc)
+        }
+    
+@app.route("/git-context-test", methods=["POST"])
+def git_context_test():
+
+    try:
+
+        data = request.get_json() or {}
+
+        question = data.get("question", "").strip()
+
+        if not question:
+            return jsonify({
+                "success": False,
+                "error": "Question is required"
+            }), 400
+
+        git_context = get_git_context(question)
+
+        return jsonify({
+            "success": True,
+            "question": question,
+            "git_context": git_context
+        })
+
+    except Exception as exc:
+
+        return jsonify({
+            "success": False,
+            "error": str(exc)
+        }), 500
+    
+import time
+
 @app.route("/chat-stream", methods=["POST"])
 def chat_stream():
 
@@ -109,27 +484,140 @@ def chat_stream():
 
     messages = data["messages"]
 
-    # Optional per-chat session id sent by the frontend "New chat" listener.
-    # Falls back to the server-wide session id for older clients, so the
-    # previous behaviour is fully preserved.
+    # Optional per-chat session id sent by the frontend.
+    # Falls back to the server-wide session id for older clients.
     active_session_id = data.get("session_id") or session_id
 
+    # ---------------------------------------------------------
+    # Get latest user message
+    # ---------------------------------------------------------
+
+    user_message = ""
+
+    for message in reversed(messages):
+
+        if message.get("role") == "user":
+
+            user_message = message.get(
+                "content",
+                ""
+            ).strip()
+
+            break
+
+    # ---------------------------------------------------------
+    # Get Git context if required
+    # ---------------------------------------------------------
+
+    git_context = None
+
+    if user_message:
+
+        try:
+
+            git_context = get_git_context(
+                user_message
+            )
+
+            print(
+                "\n===== CHAT STREAM GIT CONTEXT ====="
+            )
+
+            print(git_context)
+
+        except Exception as exc:
+
+            print(
+                "\n===== GIT CONTEXT ERROR ====="
+            )
+
+            print(str(exc))
+
+            git_context = None
+
+    # ---------------------------------------------------------
+    # Prepare messages for Ollama
+    # ---------------------------------------------------------
+
+    messages_for_ollama = messages.copy()
+
+    if (
+        git_context
+        and git_context.get("used_git")
+    ):
+
+        git_result = git_context.get(
+            "result",
+            ""
+        )
+
+        if git_result:
+
+            messages_for_ollama.append({
+
+                "role": "system",
+
+                "content": (
+                    "The following information was "
+                    "retrieved from the Git repository. "
+                    "Use it to answer the user's question "
+                    "accurately. "
+                    "Do not invent Git information.\n\n"
+                    "GIT CONTEXT:\n"
+                    + str(git_result)
+                )
+            })
+
+    # ---------------------------------------------------------
+    # Stream response from Ollama
+    # ---------------------------------------------------------
+
     def generate():
+
         full_reply = ""
 
         try:
+
+            ollama_start = time.time()
+
+            first_token = True
+
+            print(
+                "\n===== FINAL OLLAMA REQUEST ====="
+            )
+
+            print(
+                "Starting Ollama request..."
+            )
+
             response = requests.post(
+
                 OLLAMA_URL,
+
                 json={
+
                     "model": OLLAMA_MODEL,
-                    "messages": messages,
+
+                    "messages": messages_for_ollama,
+
                     "stream": OLLAMA_STREAM
                 },
+
                 stream=True,
+
                 timeout=OLLAMA_TIMEOUT
             )
 
             response.raise_for_status()
+
+            print(
+                "Ollama HTTP response received in: "
+                f"{time.time() - ollama_start:.2f} seconds"
+            )
+
+            # -------------------------------------------------
+            # Read streaming response
+            # -------------------------------------------------
 
             for line in response.iter_lines():
 
@@ -138,28 +626,89 @@ def chat_stream():
 
                 chunk = json.loads(line)
 
+                # ---------------------------------------------
+                # Ollama error
+                # ---------------------------------------------
+
                 if "error" in chunk:
-                    yield f"\n[Error: {chunk['error']}]"
+
+                    yield (
+                        f"\n[Error: "
+                        f"{chunk['error']}]"
+                    )
+
                     break
 
+                # ---------------------------------------------
+                # Normal response
+                # ---------------------------------------------
+
                 if "message" in chunk:
+
                     text = chunk["message"]["content"]
+
+                    # Time to first token
+                    if first_token:
+
+                        print(
+                            "Time to first token: "
+                            f"{time.time() - ollama_start:.2f} seconds"
+                        )
+
+                        first_token = False
 
                     full_reply += text
 
                     yield text
 
+            # -------------------------------------------------
+            # Total Ollama time
+            # -------------------------------------------------
+
+            print(
+                "Total Ollama streaming time: "
+                f"{time.time() - ollama_start:.2f} seconds"
+            )
+
         except requests.exceptions.ConnectionError:
-            yield ("\n[Error: Could not connect to Ollama at "
-                   + OLLAMA_URL + ". Is the Ollama server running?]")
+
+            yield (
+                "\n[Error: Could not connect to Ollama at "
+                + OLLAMA_URL
+                + ". Is the Ollama server running?]"
+            )
+
         except requests.exceptions.Timeout:
-            yield "\n[Error: Ollama request timed out.]"
+
+            yield (
+                "\n[Error: Ollama request timed out.]"
+            )
+
         except Exception as exc:
-            yield f"\n[Error: {exc}]"
 
-        save_chat(active_session_id, messages, full_reply)
+            yield (
+                f"\n[Error: {exc}]"
+            )
 
-    return Response(generate(), mimetype="text/plain")
+        # -----------------------------------------------------
+        # Save original chat messages
+        # -----------------------------------------------------
+
+        save_chat(
+            active_session_id,
+            messages,
+            full_reply
+        )
+
+    # ---------------------------------------------------------
+    # IMPORTANT:
+    # Return the streaming response
+    # ---------------------------------------------------------
+
+    return Response(
+        generate(),
+        mimetype="text/plain"
+    )
 
 @app.route("/sessions", methods=["GET"])
 def get_sessions():
@@ -522,6 +1071,59 @@ def server_info():
         "server": "AI-Bot Flask",
         "message": "This is the correct Flask server"
     })
+
+@app.route("/git-mcp-test", methods=["POST"])
+def git_mcp_test():
+
+    try:
+        data = request.get_json() or {}
+
+        tool = data.get("tool", "git_status")
+
+        if tool == "git_status":
+            result = git_status()
+
+        elif tool == "git_log":
+            limit = data.get("limit", 10)
+            result = git_log(limit)
+
+        elif tool == "git_diff":
+            result = git_diff()
+
+        elif tool == "git_branches":
+            result = git_branches()
+
+        elif tool == "git_search":
+            keyword = data.get("keyword", "")
+            result = git_search(keyword)
+
+        elif tool == "git_file_history":
+            filename = data.get("filename", "")
+            limit = data.get("limit", 10)
+            result = git_file_history(filename, limit)
+
+        elif tool == "git_show_commit":
+            commit = data.get("commit", "")
+            result = git_show_commit(commit)
+
+        else:
+            return jsonify({
+                "success": False,
+                "error": f"Unknown Git MCP tool: {tool}"
+            }), 400
+
+        return jsonify({
+            "success": True,
+            "tool": tool,
+            "result": result
+        })
+
+    except Exception as exc:
+
+        return jsonify({
+            "success": False,
+            "error": str(exc)
+        }), 500
 
 if __name__ == "__main__":
     app.run(debug=True)

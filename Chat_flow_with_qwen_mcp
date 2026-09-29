@@ -1,0 +1,23 @@
+Angular Chat UI
+      ↓
+/chat-stream
+      ↓
+ask_qwen_for_git_tool()
+      ↓
+parse_git_decision()
+      ↓
+   ┌───────────────┐
+   │ use_git=true? │
+   └───────┬───────┘
+       Yes │ No
+           │
+           ↓
+ execute_git_tool()       Normal RAG / Qwen flow
+           ↓
+ get_git_context()
+           ↓
+      Final Qwen prompt
+           ↓
+      Streaming response
+           ↓
+        Angular
