@@ -34,6 +34,20 @@ from mcp_client import (
     git_file_history,
     git_show_commit
 )
+
+from mcp_client import (
+    jenkins_get_status,
+    jenkins_get_jobs,
+    jenkins_get_job,
+    jenkins_get_build,
+    jenkins_get_build_log,
+    jenkins_search_build_log,
+    jenkins_get_test_results,
+    jenkins_get_build_scm,
+    jenkins_get_build_changesets,
+    jenkins_get_job_scm,
+    jenkins_who_am_i
+)
 from rag_service import ask_rag
 
 
@@ -61,6 +75,7 @@ app = Flask(
     )
 )
 
+ROUTER_MODEL = "llama3.2:latest"
 
 # Enable CORS on the actual Flask app
 CORS(app)
@@ -87,6 +102,16 @@ app = Flask(
 )
 
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
+
+def execute_api_tool(tool_name, arguments):
+
+    if tool_name == "get_sessions":
+        return list_sessions()
+
+    else:
+        raise ValueError(
+            f"Unsupported API tool: {tool_name}"
+        )
 
 @app.after_request
 def add_cors_headers(response):
@@ -153,141 +178,89 @@ def execute_git_tool(tool_name, arguments):
 def ask_qwen_for_git_tool(question):
 
     prompt = f"""
-You are a Git analysis assistant.
+        Classify the user request and select a tool.
 
-User question:
-{question}
+        USER:
+        {question}
 
-Determine whether the question requires information from the Git repository.
+        RULES:
 
-If Git information is NOT required, return ONLY:
+        1. If the user asks about Jenkins, CI/CD, builds, jobs, pipelines,
+        console logs, test results, SCM information, or Jenkins status,
+        you MUST use source "jenkins".
 
-{{
-    "use_git": false
-}}
+        2. If the user asks about Git, commits, branches, status, diff,
+        files, Git history, or repository information,
+        you MUST use source "git".
 
-If Git information IS required, select the most appropriate tool from the
-following allowed Git tools.
+        3. If the user asks about application chat sessions,
+        use source "api" and tool "get_sessions".
 
-Available tools:
+        4. For anything else, use no tool.
 
-1. git_status
-   Use for questions about the current working tree status,
-   modified files, staged files, or uncommitted changes.
+        JENKINS TOOLS:
+        getStatus
+        getJobs
+        getJob
+        getBuild
+        getBuildLog
+        searchBuildLog
+        getTestResults
+        getBuildScm
+        getBuildChangeSets
+        getJobScm
+        whoAmI
 
-2. git_log
-   Use for questions about commits, recent commits, commit history,
-   or latest commits.
+        GIT TOOLS:
+        git_status
+        git_log
+        git_diff
+        git_branches
+        git_search
+        git_file_history
+        git_show_commit
 
-3. git_diff
-   Use for questions about current code changes or differences.
+        API TOOLS:
+        get_sessions
 
-4. git_branches
-   Use for questions about branches, available branches,
-   current branches, or branch names.
+        For Jenkins questions, return:
+        {{"use_tool":true,"source":"jenkins","tool":"getJobs","arguments":{{}}}}
 
-5. git_search
-   Use for searching the repository for a keyword or text.
+        For Git questions, return the appropriate Git tool.
 
-6. git_file_history
-   Use for questions about the history of a specific file.
+        For API questions, return:
+        {{"use_tool":true,"source":"api","tool":"get_sessions","arguments":{{}}}}
 
-7. git_show_commit
-   Use when the user asks about a specific commit.
+        For normal questions, return:
+        {{"use_tool":false}}
 
-Return ONLY JSON.
+        Return ONLY valid JSON.
+        Do not explain.
+        """
 
-Examples:
-
-Question:
-Show me the latest commits
-
-Return:
-{{
-    "use_git": true,
-    "tool": "git_log",
-    "arguments": {{
-        "limit": 10
-    }}
-}}
-
-Question:
-Show me the available branches
-
-Return:
-{{
-    "use_git": true,
-    "tool": "git_branches",
-    "arguments": {{}}
-}}
-
-Question:
-What files have been modified?
-
-Return:
-{{
-    "use_git": true,
-    "tool": "git_status",
-    "arguments": {{}}
-}}
-
-Question:
-Show me the changes
-
-Return:
-{{
-    "use_git": true,
-    "tool": "git_diff",
-    "arguments": {{}}
-}}
-
-Question:
-Show the history of app.py
-
-Return:
-{{
-    "use_git": true,
-    "tool": "git_file_history",
-    "arguments": {{
-        "filename": "app.py",
-        "limit": 10
-    }}
-}}
-
-Question:
-Show commit 9d2f197
-
-Return:
-{{
-    "use_git": true,
-    "tool": "git_show_commit",
-    "arguments": {{
-        "commit": "9d2f197"
-    }}
-}}
-
-Do not use markdown.
-Do not add any explanation.
-Return ONLY the JSON object.
-"""
-
-    print("\n===== QWEN GIT TOOL TEST =====")
+    print("\n===== QWEN TOOL ROUTER TEST =====")
     print("Question:", question)
-    print("Model:", OLLAMA_MODEL)
+    print("Model:", ROUTER_MODEL)
     print("URL:", OLLAMA_URL)
+    
 
     response = requests.post(
         OLLAMA_URL,
         json={
-            "model": OLLAMA_MODEL,
+            "model": ROUTER_MODEL,
             "messages": [
                 {
                     "role": "user",
                     "content": prompt
                 }
             ],
-            "stream": False
-        },
+            "stream": False,
+            "think": False,
+            "options": {
+                "temperature": 0,
+                "num_predict": 100
+            }
+                    },
         timeout=OLLAMA_TIMEOUT
     )
 
@@ -298,7 +271,13 @@ Return ONLY the JSON object.
 
     result = response.json()
 
-    answer = result.get("message", {}).get("content", "")
+    answer = result.get(
+        "message",
+        {}
+    ).get(
+        "content",
+        ""
+    )
 
     print("Qwen Answer:", repr(answer))
 
@@ -333,6 +312,54 @@ def git_ai_test():
             "error": str(exc)
         }), 500
 
+def parse_tool_decision(decision_text):
+
+    try:
+        decision_text = decision_text.strip()
+
+        # Direct JSON
+        try:
+            decision = json.loads(decision_text)
+
+            if isinstance(decision, dict):
+                return decision
+
+        except json.JSONDecodeError:
+            pass
+
+        # Find JSON object inside the response
+        start = decision_text.find("{")
+        end = decision_text.rfind("}")
+
+        if start != -1 and end != -1 and end > start:
+
+            json_text = decision_text[start:end + 1]
+
+            try:
+                decision = json.loads(json_text)
+
+                if isinstance(decision, dict):
+                    return decision
+
+            except json.JSONDecodeError:
+                pass
+
+        print("Unable to extract valid JSON from Qwen:")
+        print(decision_text)
+
+        return {
+            "use_tool": False
+        }
+
+    except Exception as exc:
+
+        print("Tool decision parsing error:")
+        print(str(exc))
+
+        return {
+            "use_tool": False
+        }
+
 def parse_git_decision(decision_text):
     """
     Convert Qwen's Git decision into a Python dictionary.
@@ -359,6 +386,203 @@ def parse_git_decision(decision_text):
 
 
 import time
+
+def execute_jenkins_tool(tool_name, arguments):
+
+    if tool_name == "getStatus":
+        return jenkins_get_status()
+
+    elif tool_name == "getJobs":
+        return jenkins_get_jobs()
+
+    elif tool_name == "getJob":
+        return jenkins_get_job(
+            arguments.get("jobFullName", "")
+        )
+
+    elif tool_name == "getBuild":
+        return jenkins_get_build(
+            arguments.get("jobFullName", ""),
+            arguments.get("buildNumber")
+        )
+
+    elif tool_name == "getBuildLog":
+        return jenkins_get_build_log(
+            arguments.get("jobFullName", ""),
+            arguments.get("buildNumber"),
+            arguments.get("limit")
+        )
+
+    elif tool_name == "searchBuildLog":
+        return jenkins_search_build_log(
+            arguments.get("jobFullName", ""),
+            arguments.get("pattern", ""),
+            arguments.get("buildNumber")
+        )
+
+    elif tool_name == "getTestResults":
+        return jenkins_get_test_results(
+            arguments.get("jobFullName", ""),
+            arguments.get("buildNumber"),
+            arguments.get("onlyFailingTests", False)
+        )
+
+    elif tool_name == "getBuildScm":
+        return jenkins_get_build_scm(
+            arguments.get("jobFullName", ""),
+            arguments.get("buildNumber")
+        )
+
+    elif tool_name == "getBuildChangeSets":
+        return jenkins_get_build_changesets(
+            arguments.get("jobFullName", ""),
+            arguments.get("buildNumber")
+        )
+
+    elif tool_name == "getJobScm":
+        return jenkins_get_job_scm(
+            arguments.get("jobFullName", "")
+        )
+
+    elif tool_name == "whoAmI":
+        return jenkins_who_am_i()
+
+    else:
+        raise ValueError(
+            f"Unsupported Jenkins MCP tool: {tool_name}"
+        )
+
+def get_tool_context(question):
+
+    start = time.time()
+
+    print("\n===== TOOL CONTEXT START =====")
+
+    # Ask Qwen which tool is required
+    decision_start = time.time()
+
+    decision_text = ask_qwen_for_git_tool(question)
+
+    print(
+        f"Qwen tool decision time: "
+        f"{time.time() - decision_start:.2f} seconds"
+    )
+
+    # Parse Qwen decision
+    decision = parse_tool_decision(
+        decision_text
+    )
+
+    print("\n===== TOOL DECISION =====")
+    print(decision)
+
+    # No tool required
+    if not decision.get("use_tool", False):
+
+        print(
+            f"Total tool context time: "
+            f"{time.time() - start:.2f} seconds"
+        )
+
+        return {
+            "used_tool": False,
+            "source": None,
+            "tool": None,
+            "result": ""
+        }
+
+    source = str(decision.get(
+        "source", "")
+    ).strip().lower()
+
+    tool_name = decision.get(
+        "tool"
+    )
+
+    arguments = decision.get(
+        "arguments",
+        {}
+    )
+
+    if not source or not tool_name:
+
+        print("Invalid tool decision.")
+
+        return {
+            "used_tool": False,
+            "source": source,
+            "tool": tool_name,
+            "result": ""
+        }
+
+    print("\n===== EXECUTING TOOL =====")
+    print("Source:", source)
+    print("Tool:", tool_name)
+    print("Arguments:", arguments)
+
+    tool_start = time.time()
+
+    try:
+
+        if source == "git":
+
+            result = execute_git_tool(
+                tool_name,
+                arguments
+            )
+
+        elif source == "jenkins":
+
+            result = execute_jenkins_tool(
+                tool_name,
+                arguments
+            )
+
+        elif source == "api":
+
+            result = execute_api_tool(
+                tool_name,
+                arguments
+            )
+
+        else:
+
+            raise ValueError(
+                f"Unsupported tool source: {source}"
+            )
+
+        print(
+            f"Tool execution time: "
+            f"{time.time() - tool_start:.2f} seconds"
+        )
+
+        print("\n===== TOOL RESULT =====")
+        print(result)
+
+        print(
+            f"Total tool context time: "
+            f"{time.time() - start:.2f} seconds"
+        )
+
+        return {
+            "used_tool": True,
+            "source": source,
+            "tool": tool_name,
+            "result": result
+        }
+
+    except Exception as exc:
+
+        print("\n===== TOOL ERROR =====")
+        print(str(exc))
+
+        return {
+            "used_tool": False,
+            "source": source,
+            "tool": tool_name,
+            "result": "",
+            "error": str(exc)
+        }
 
 def get_git_context(question):
 
@@ -509,31 +733,21 @@ def chat_stream():
     # Get Git context if required
     # ---------------------------------------------------------
 
-    git_context = None
+    tool_context = None
 
     if user_message:
-
         try:
+            tool_context = get_tool_context(user_message)
 
-            git_context = get_git_context(
-                user_message
-            )
-
-            print(
-                "\n===== CHAT STREAM GIT CONTEXT ====="
-            )
-
-            print(git_context)
+            print("\n===== CHAT STREAM TOOL CONTEXT =====")
+            print(tool_context)
 
         except Exception as exc:
 
-            print(
-                "\n===== GIT CONTEXT ERROR ====="
-            )
-
+            print("\n===== TOOL CONTEXT ERROR =====")
             print(str(exc))
 
-            git_context = None
+            tool_context = None
 
     # ---------------------------------------------------------
     # Prepare messages for Ollama
@@ -541,33 +755,25 @@ def chat_stream():
 
     messages_for_ollama = messages.copy()
 
-    if (
-        git_context
-        and git_context.get("used_git")
-    ):
+    if tool_context and tool_context.get("used_tool"):
 
-        git_result = git_context.get(
-            "result",
-            ""
-        )
+        tool_source = tool_context.get("source")
+        tool_result = tool_context.get("result", "")
 
-        if git_result:
+        if tool_result:
 
             messages_for_ollama.append({
-
                 "role": "system",
-
                 "content": (
-                    "The following information was "
-                    "retrieved from the Git repository. "
-                    "Use it to answer the user's question "
-                    "accurately. "
-                    "Do not invent Git information.\n\n"
-                    "GIT CONTEXT:\n"
-                    + str(git_result)
+                    "The following information was retrieved from an external tool. "
+                    "Use it to answer the user's question accurately. "
+                    "Do not invent information that is not present in the tool result.\n\n"
+                    f"TOOL SOURCE: {tool_source}\n\n"
+                    "TOOL RESULT:\n"
+                    + str(tool_result)
                 )
             })
-
+            
     # ---------------------------------------------------------
     # Stream response from Ollama
     # ---------------------------------------------------------
